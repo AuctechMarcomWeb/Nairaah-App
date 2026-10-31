@@ -3,9 +3,9 @@ import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, Modal,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, StatusChip, Divider } from '../components';
-import { payoutHistory } from '../data/mockData';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, StatusChip, Divider } from '../../components';
+import { payoutHistory } from '../../data/mockData';
 
 function PayoutCard({ item, onPress }) {
   return (

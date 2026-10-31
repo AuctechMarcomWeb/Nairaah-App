@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
+import { colors, spacing, radius, elevation, typography } from '../themes';
 
 /**
  * StatsBanner — horizontal stats row with dividers

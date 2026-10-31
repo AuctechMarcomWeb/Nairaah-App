@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Icon from './Icon';
-import { colors, typography, spacing } from '../theme';
+import { colors, spacing, radius, elevation, typography } from '../themes';
 
 /**
  * InfoRow — icon + label + value row (used in Profile, modals)

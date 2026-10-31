@@ -3,15 +3,15 @@ import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, Modal,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, StatusChip, Divider } from '../components';
-import Icon, { Icons } from '../components/Icon';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, StatusChip, Divider } from '../../components';
+import Icon, { Icons } from '../../components/Icon';
 import {
   teamMembers, payoutHistory, payoutCycles, salesHistory,
   commissionHistory, levelCommissions, earningsByLevel,
   monthlyCapping, cappingSlots, cappingPerSlot,
   payoutPolicy, dashboardStats,
-} from '../data/mockData';
+} from '../../data/mockData';
 
 function flattenTeam(members) {
   let result = [];

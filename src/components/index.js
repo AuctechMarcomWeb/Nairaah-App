@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
+import { colors, spacing, radius, elevation, typography } from '../themes';
 import Icon from './Icon';
 
 // ── Re-exports (separate files for cleaner imports) ───────

@@ -3,9 +3,9 @@ import {
   View, Text, ScrollView, StyleSheet,
   TextInput, TouchableOpacity, StatusBar, Alert,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, PrimaryButton } from '../components';
-import { distributorAssignableLevels } from '../data/mockData';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, PrimaryButton } from '../../components';
+import { distributorAssignableLevels } from '../../data/mockData';
 
 function Field({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
   const [focused, setFocused] = useState(false);

@@ -3,7 +3,7 @@ import {
   View, Text, Modal, FlatList,
   TouchableOpacity, StyleSheet,
 } from 'react-native';
-import { colors, typography, spacing, radius } from '../theme';
+import { colors, spacing, radius, elevation, typography } from '../themes';
 import { Divider } from './index';
 
 /**

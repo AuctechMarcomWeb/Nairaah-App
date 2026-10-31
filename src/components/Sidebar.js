@@ -8,10 +8,13 @@ import {
   Image, ScrollView, Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { colors, typography, radius, spacing } from '../theme';
+import { useDispatch } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors, typography, radius, spacing } from '../themes';
 import Icon, { Icons } from './Icon';
 import { distributor } from '../data/mockData';
 import { LevelBadge } from './index';
+import { logout } from '../redux/slice/userSlice';
 
 const { height: H } = Dimensions.get('window');
 
@@ -89,6 +92,8 @@ function SectionTitle({ label }) {
 //  Main Sidebar Component
 // ══════════════════════════════════════════════════════════
 export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashboard' }) {
+  const dispatch = useDispatch();
+
   const goTo = (screen) => {
     closeDrawer();
     // Tab screens navigate within Main, stack screens navigate directly
@@ -102,9 +107,18 @@ export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashbo
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     closeDrawer();
-    setTimeout(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] }), 200);
+    
+    // Clear Redux
+    dispatch(logout());
+    
+    // Clear AsyncStorage
+    await AsyncStorage.removeItem('authToken');
+    await AsyncStorage.removeItem('userData');
+    
+    // Navigate to Login - the token being cleared will trigger navigation automatically
+    setTimeout(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] }), 100);
   };
 
   return (

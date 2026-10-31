@@ -3,9 +3,9 @@ import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, Alert, Modal,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, StatusChip, Divider, PrimaryButton, SearchBar, StatsBanner } from '../components';
-import { customers } from '../data/mockData';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, StatusChip, Divider, PrimaryButton, SearchBar, StatsBanner } from '../../components';
+import { customers } from '../../data/mockData';
 
 function CustomerCard({ item, onPress }) {
   return (

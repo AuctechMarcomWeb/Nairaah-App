@@ -3,9 +3,9 @@ import {
   View, Text, ScrollView, StyleSheet, TextInput,
   TouchableOpacity, StatusBar, Alert,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, PrimaryButton, Divider, PickerModal } from '../components';
-import { customers, products } from '../data/mockData';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, PrimaryButton, Divider, PickerModal } from '../../components';
+import { customers, products } from '../../data/mockData';
 
 const GST_RATE = 18;
 

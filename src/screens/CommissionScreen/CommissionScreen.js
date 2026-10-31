@@ -3,11 +3,11 @@ import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, Modal,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, StatusChip, Divider } from '../components';
-import Icon, { Icons } from '../components/Icon';
-import { commissionHistory } from '../data/mockData';
-import { UPLINE_LEVEL_COLORS } from '../constants/levels';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, StatusChip, Divider } from '../../components';
+import Icon, { Icons } from '../../components/Icon';
+import { commissionHistory } from '../../data/mockData';
+import { UPLINE_LEVEL_COLORS } from '../../constants/levels';
 
 // ── Commission Card ───────────────────────────────────────
 function CommCard({ item, onPress }) {

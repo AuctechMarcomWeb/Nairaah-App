@@ -4,9 +4,9 @@ import {
   TouchableOpacity, StatusBar,
   Modal, FlatList,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, StatusChip, Divider, SearchBar, Dropdown } from '../components';
-import { salesHistory } from '../data/mockData';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, StatusChip, Divider, SearchBar, Dropdown } from '../../components';
+import { salesHistory } from '../../data/mockData';
 
 // ─────────────────────────────────────────────────────────
 // Product Detail Modal — opens on row click

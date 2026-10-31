@@ -4,7 +4,7 @@ import {
   StatusBar, Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { colors, typography } from '../theme';
+import { colors, typography } from '../../themes';
 
 // ── Brand gradient (matches LoginScreen hero) ──────────────
 const GRAD = ['#0F0C29', '#302B63', '#24243E'];
@@ -45,7 +45,7 @@ export default function SplashScreen({ navigation }) {
       <Animated.View style={[s.logoWrap, { opacity: fade, transform: [{ scale }] }]}>
         <View style={s.logoCard}>
           <Image
-            source={require('../assets/images/nairaah_logo.png')}
+            source={require('../../assets/images/nairaah_logo.png')}
             style={s.logoImg}
             resizeMode="contain"
           />

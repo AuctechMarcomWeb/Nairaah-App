@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors, typography, spacing, radius } from '../theme';
+import { colors, spacing, radius, elevation, typography } from '../themes';
 
 /**
  * SearchBar — reusable search input

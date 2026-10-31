@@ -3,10 +3,10 @@ import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, Alert,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, PrimaryButton, Divider, LevelBadge, InfoRow, FormField } from '../components';
-import Icon, { Icons } from '../components/Icon';
-import { distributor } from '../data/mockData';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, PrimaryButton, Divider, LevelBadge, InfoRow, FormField } from '../../components';
+import Icon, { Icons } from '../../components/Icon';
+import { distributor } from '../../data/mockData';
 
 export default function ProfileScreen({ navigation }) {
   const [editMode, setEditMode] = useState(false);

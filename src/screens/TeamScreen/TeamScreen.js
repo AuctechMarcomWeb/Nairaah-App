@@ -4,11 +4,11 @@ import {
   TouchableOpacity, StatusBar, TextInput,
   Modal, FlatList, Linking, Alert,
 } from 'react-native';
-import { colors, typography, spacing, radius, elevation } from '../theme';
-import { AppHeader, Divider, StatusChip, LevelBadge } from '../components';
-import Icon, { Icons } from '../components/Icon';
-import { distributor, teamMembers } from '../data/mockData';
-import { LEVEL_LABELS, LEVEL_COLORS } from '../constants/levels';
+import { colors, spacing, radius, elevation, typography } from '../../themes';
+import { AppHeader, Divider, StatusChip, LevelBadge } from '../../components';
+import Icon, { Icons } from '../../components/Icon';
+import { distributor, teamMembers } from '../../data/mockData';
+import { LEVEL_LABELS, LEVEL_COLORS } from '../../constants/levels';
 
 // ── Phone call helper ─────────────────────────────────────
 function makeCall(mobile) {

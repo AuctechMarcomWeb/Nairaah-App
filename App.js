@@ -1,11 +1,19 @@
 import React from 'react';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import AppNavigator from './src/navigation/AppNavigator';
+import { Provider } from 'react-redux';
+import store from './src/redux/store';
+import { preloadToken } from './src/api/apiConfig';
+import RootNavigation from './src/navigation/RootNavigation';
+import { DrawerProvider } from './src/navigation/DrawerContext';
+
+// Pre-warm token on app start
+preloadToken().catch(console.error);
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AppNavigator />
-    </SafeAreaProvider>
+    <Provider store={store}>
+      <DrawerProvider>
+        <RootNavigation />
+      </DrawerProvider>
+    </Provider>
   );
 }
