@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Modal,
+  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider, SearchBar } from '../../components';
-import { products } from '../../data/mockData';
+import { getAllProducts } from '../../api/products';
 
 const categories = ['All', 'Health', 'Beauty', 'Nutrition'];
 
@@ -201,12 +201,55 @@ const dm = StyleSheet.create({
 });
 
 export default function ProductsScreen({ navigation }) {
+  const [productList, setProductList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [categories, setCategories] = useState(['All']);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
 
-  const filtered = products.filter(p => {
+  const fetchProducts = useCallback(async () => {
+    try {
+      const res = await getAllProducts();
+      if (res.success) {
+        const list = (res.data?.products || res.data || []).map(p => ({
+          ...p,
+          id: p._id,
+          name: p.name || p.productName || '',
+          category: p.category?.name || p.categoryName || p.category || 'General',
+          description: p.description || p.desc || '',
+          mrp: p.mrp || p.MRP || 0,
+          sellingPrice: p.sellingPrice || p.price || p.distributorPrice || 0,
+          unit: p.unit || p.unitType || 'pc',
+          inStock: p.inStock ?? (p.stock > 0) ?? true,
+        }));
+        setProductList(list);
+        // Auto-build category filter from products
+        const cats = ['All', ...new Set(list.map(p => p.category))];
+        setCategories(cats);
+      }
+    } catch (e) {
+      console.error('[PRODUCTS SCREEN] fetch error:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchProducts();
+      setLoading(false);
+    })();
+  }, [fetchProducts]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProducts();
+    setRefreshing(false);
+  };
+
+  const filtered = productList.filter(p => {
     const catOk = activeCategory === 'All' || p.category === activeCategory;
     const searchOk = p.name.toLowerCase().includes(search.toLowerCase());
     return catOk && searchOk;
@@ -215,18 +258,11 @@ export default function ProductsScreen({ navigation }) {
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
-      <AppHeader title="Products" subtitle={`${products.length} products`} />
+      <AppHeader title="Products" subtitle={`${productList.length} products`} />
 
       <View style={s.body}>
-        {/* Search */}
-        <SearchBar
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search products..."
-          style={s.searchBox}
-        />
+        <SearchBar value={search} onChangeText={setSearch} placeholder="Search products..." style={s.searchBox} />
 
-        {/* Category chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
           {categories.map(cat => (
             <TouchableOpacity
@@ -238,18 +274,26 @@ export default function ProductsScreen({ navigation }) {
           ))}
         </ScrollView>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-          {filtered.map(p => (
-            <ProductCard key={p.id} item={p} onPress={() => { setSelected(p); setShowDetail(true); }} />
-          ))}
-          {filtered.length === 0 && (
-            <View style={s.empty}>
-              <Text style={s.emptyIcon}>📦</Text>
-              <Text style={s.emptyText}>No products found</Text>
-            </View>
-          )}
-          <View style={{ height: 24 }} />
-        </ScrollView>
+        {loading ? (
+          <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={s.scroll}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          >
+            {filtered.map(p => (
+              <ProductCard key={p.id} item={p} onPress={() => { setSelected(p); setShowDetail(true); }} />
+            ))}
+            {filtered.length === 0 && (
+              <View style={s.empty}>
+                <Text style={s.emptyIcon}>📦</Text>
+                <Text style={s.emptyText}>No products found</Text>
+              </View>
+            )}
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        )}
       </View>
 
       <DetailModal

@@ -1,17 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Modal,
+  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider } from '../../components';
 import Icon, { Icons } from '../../components/Icon';
-import {
-  teamMembers, payoutHistory, payoutCycles, salesHistory,
-  commissionHistory, levelCommissions, earningsByLevel,
-  monthlyCapping, cappingSlots, cappingPerSlot,
-  payoutPolicy, dashboardStats,
-} from '../../data/mockData';
+import { getMyTeamBusiness } from '../../api/team';
+import { getMyPayouts } from '../../api/payout';
+import { getMyCommissionSummary, getLevelCommissionSummary } from '../../api/commission';
 
 function flattenTeam(members) {
   let result = [];
@@ -23,10 +21,7 @@ function flattenTeam(members) {
   return result;
 }
 
-const allMembers      = flattenTeam(teamMembers);
-const selfBusiness    = salesHistory.reduce((a, s) => a + s.totalAmount, 0);
-const totalGroupBusiness = allMembers.reduce((a, m) => a + m.totalBusiness, 0);
-const totalBusiness   = selfBusiness + totalGroupBusiness;
+
 
 // ── Payout Detail Modal ───────────────────────────────────
 function PayoutDetailModal({ visible, item, onClose }) {
@@ -136,12 +131,77 @@ const dm = StyleSheet.create({
 
 // ── Main Screen ───────────────────────────────────────────
 export default function BusinessPayoutScreen() {
+  const { user } = useSelector(state => state.user);
   const [activeTab, setActiveTab] = useState('business');
   const [selectedPayout, setSelectedPayout] = useState(null);
   const [showPayoutDetail, setShowPayoutDetail] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const totalPaid   = payoutHistory.filter(p => p.status === 'Paid').reduce((a, p) => a + (p.netAmount || 0), 0);
-  const pendingComm = commissionHistory.filter(c => c.status === 'Pending').reduce((a, c) => a + c.amount, 0);
+  // Business tab data
+  const [teamBusiness, setTeamBusiness] = useState(null);
+  const [levelBreakdown, setLevelBreakdown] = useState([]);
+  const [commSummary, setCommSummary] = useState(null);
+  // Payout tab data
+  const [payouts, setPayouts] = useState([]);
+
+  const fetchAll = useCallback(async () => {
+    const id = user?._id || user?.userId;
+    if (!id) return;
+    try {
+      const [bizRes, payRes, commRes, levelRes] = await Promise.all([
+        getMyTeamBusiness(id),
+        getMyPayouts(id),
+        getMyCommissionSummary(id),
+        getLevelCommissionSummary(id),
+      ]);
+      if (bizRes.success) setTeamBusiness(bizRes.data);
+      if (payRes.success) {
+        const normalized = (payRes.data?.payouts || payRes.data || []).map(p => ({
+          ...p,
+          id: p._id,
+          cycleStart: p.cycleStart || (p.periodFrom ? new Date(p.periodFrom).toLocaleDateString('en-IN') : ''),
+          cycleEnd: p.cycleEnd || (p.periodTo ? new Date(p.periodTo).toLocaleDateString('en-IN') : ''),
+          totalBusiness: p.totalBusiness || 0,
+          commissionEarned: p.commissionEarned || p.totalCommission || 0,
+          netAmount: p.netAmount || p.payableAmount || null,
+          tds: p.tds || null,
+          status: p.status || 'Pending',
+          levelBreakup: p.levelBreakup || p.levelWise || [],
+          referenceNo: p.referenceNo || p.transactionId || null,
+          bankName: p.bankName || '',
+          accountLast4: p.accountLast4 || '',
+          processedDate: p.processedDate || (p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN') : null),
+        }));
+        setPayouts(normalized);
+      }
+      if (commRes.success) setCommSummary(commRes.data);
+      if (levelRes.success) setLevelBreakdown(levelRes.data?.levelSummary || levelRes.data || []);
+    } catch (e) {
+      console.error('[BUSINESS PAYOUT] fetch error:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchAll();
+      setLoading(false);
+    })();
+  }, [fetchAll]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
+  };
+
+  const totalPaid   = payouts.filter(p => p.status === 'Paid').reduce((a, p) => a + (p.netAmount || 0), 0);
+  const pendingComm = (commSummary?.commissions || []).filter(c => c.status === 'Pending').reduce((a, c) => a + (c.amount || 0), 0);
+
+  const selfBusiness    = teamBusiness?.selfBusiness || 0;
+  const totalGroupBusiness = teamBusiness?.groupBusiness || teamBusiness?.totalGroupBusiness || 0;
+  const totalBusiness   = selfBusiness + totalGroupBusiness;
 
   return (
     <View style={s.container}>
@@ -164,232 +224,137 @@ export default function BusinessPayoutScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-        {activeTab === 'business' && (
-          <>
-            {/* Total Business Banner */}
-            <View style={s.banner}>
-              <View style={s.bannerLeft}>
-                <Text style={s.bannerLabel}>Total Group Business</Text>
-                <Text style={s.bannerVal}>₹{totalBusiness.toLocaleString()}</Text>
-              </View>
-              <View style={s.bannerRight}>
-                <Text style={s.bannerLabel}>My Self Business</Text>
-                <Text style={s.bannerValSm}>₹{selfBusiness.toLocaleString()}</Text>
-                <Text style={[s.bannerLabel, { marginTop: 8 }]}>Team Business</Text>
-                <Text style={s.bannerValSm}>₹{totalGroupBusiness.toLocaleString()}</Text>
-              </View>
-            </View>
-
-            {/* Monthly Capping */}
-            <View style={s.cappingCard}>
-              <View style={s.cappingRow}>
-                <View style={s.cappingLeft}>
-                  <Text style={s.cappingTitle}>Monthly Capping ({cappingSlots} slots)</Text>
-                  <Text style={s.cappingAmt}>₹{cappingPerSlot.toLocaleString()} × {cappingSlots} = ₹{monthlyCapping.toLocaleString()}</Text>
-                  <Text style={s.cappingEarned}>This month: ₹{dashboardStats.thisMonthEarning.toLocaleString()}</Text>
+      {loading ? (
+        <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {activeTab === 'business' && (
+            <>
+              {/* Total Business Banner */}
+              <View style={s.banner}>
+                <View style={s.bannerLeft}>
+                  <Text style={s.bannerLabel}>Total Group Business</Text>
+                  <Text style={s.bannerVal}>₹{totalBusiness.toLocaleString()}</Text>
                 </View>
-                <View style={s.cappingRight}>
-                  <View style={s.cappingCircle}>
-                    <Text style={s.cappingPct}>{Math.round((dashboardStats.thisMonthEarning / monthlyCapping) * 100)}%</Text>
-                    <Text style={s.cappingPctLabel}>Used</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-                {Array.from({ length: cappingSlots }).map((_, i) => {
-                  const slotEarned = Math.max(0, Math.min(cappingPerSlot, dashboardStats.thisMonthEarning - i * cappingPerSlot));
-                  return (
-                    <View key={i} style={{ flex: 1 }}>
-                      <View style={s.cappingBarBg}>
-                        <View style={[s.cappingBarFill, { width: `${Math.min((slotEarned / cappingPerSlot) * 100, 100)}%`, backgroundColor: slotEarned >= cappingPerSlot ? colors.successContainer : colors.primaryLight }]} />
-                      </View>
-                      <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, textAlign: 'center', marginTop: 2 }}>Slot {i + 1}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Bonus Structure */}
-            <View style={s.card}>
-              <Text style={s.cardTitle}>Bonus Structure</Text>
-              <View style={s.bonusRow}>
-                <View style={s.bonusItem}>
-                  <Icon name={Icons.target} size={28} color={colors.primary} style={{ marginBottom: 6 }} />
-                  <Text style={s.bonusLabel}>Per ₹10,000 sale</Text>
-                  <Text style={s.bonusVal}>1% Bonus</Text>
-                  <Text style={s.bonusType}>Cash</Text>
-                </View>
-                <View style={s.bonusDivider} />
-                <View style={s.bonusItem}>
-                  <Icon name={Icons.trophy} size={28} color={colors.warning} style={{ marginBottom: 6 }} />
-                  <Text style={s.bonusLabel}>Per ₹1,00,000 sale</Text>
-                  <Text style={s.bonusVal}>10% Bonus</Text>
-                  <Text style={s.bonusType}>Cash / Voucher</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Level Commission Table */}
-            <View style={s.card}>
-              <Text style={s.cardTitle}>Level-wise Commission Structure</Text>
-              <View style={s.levelTableHeader}>
-                <Text style={[s.lth, { width: 48 }]}>Level</Text>
-                <Text style={[s.lth, { flex: 1 }]}>Name</Text>
-                <Text style={[s.lth, { width: 48, textAlign: 'center' }]}>%</Text>
-                <Text style={[s.lth, { width: 60, textAlign: 'center' }]}>Members</Text>
-                <Text style={[s.lth, { width: 80, textAlign: 'right' }]}>Earned</Text>
-              </View>
-              {levelCommissions.map((lv, i) => {
-                const earnData = earningsByLevel.find(e => e.level === lv.level);
-                return (
-                  <View key={lv.label}>
-                    <View style={[s.levelTableRow, i % 2 !== 0 && { backgroundColor: colors.background }]}>
-                      <View style={{ width: 48 }}>
-                        <View style={[s.lvlBadge, { backgroundColor: lv.color + '20', borderColor: lv.color }]}>
-                          <Text style={[s.lvlBadgeText, { color: lv.color }]}>{lv.label}</Text>
-                        </View>
-                      </View>
-                      <Text style={[s.ltd, { flex: 1 }]}>{lv.name}</Text>
-                      <Text style={[s.ltd, { width: 48, textAlign: 'center', color: lv.color, fontWeight: '700' }]}>{lv.percent}%{!earnData && lv.level >= 8 ? '*' : ''}</Text>
-                      <Text style={[s.ltd, { width: 60, textAlign: 'center' }]}>{earnData?.members || 0}</Text>
-                      <Text style={[s.ltd, { width: 80, textAlign: 'right', color: earnData ? colors.success : colors.onSurfaceMuted, fontWeight: '700' }]}>
-                        {earnData ? `₹${earnData.earned.toLocaleString()}` : lv.level >= 8 ? 'TBC' : '—'}
-                      </Text>
-                    </View>
-                    {i < levelCommissions.length - 1 && <Divider />}
-                  </View>
-                );
-              })}
-              <Divider style={{ marginTop: 2 }} />
-              <View style={[s.levelTableRow, { backgroundColor: colors.primaryContainer }]}>
-                <View style={{ width: 48 }} />
-                <Text style={[s.ltd, { flex: 1, fontWeight: '700', color: colors.primaryDark }]}>Total</Text>
-                <Text style={{ width: 48 }} />
-                <Text style={[s.ltd, { width: 60, textAlign: 'center', fontWeight: '700' }]}>{earningsByLevel.reduce((a, e) => a + e.members, 0)}</Text>
-                <Text style={[s.ltd, { width: 80, textAlign: 'right', color: colors.primary, fontWeight: '800' }]}>₹{earningsByLevel.reduce((a, e) => a + e.earned, 0).toLocaleString()}</Text>
-              </View>
-              <Text style={{ ...typography.labelSmall, color: colors.onSurfaceMuted, marginTop: 8 }}>* 8th, 9th, 10th upline % pending client confirmation</Text>
-            </View>
-
-            {/* Commission Summary */}
-            <View style={s.card}>
-              <Text style={s.cardTitle}>Commission Summary</Text>
-              <View style={s.commRow}>
-                {[
-                  { iconName: Icons.pending,  color: colors.pending,      val: pendingComm,  label: 'Pending'  },
-                  { iconName: Icons.eligible, color: colors.primaryLight, val: commissionHistory.filter(c => c.status === 'Approved').reduce((a, c) => a + c.amount, 0), label: 'Approved' },
-                  { iconName: Icons.paid,     color: colors.success,      val: commissionHistory.filter(c => c.status === 'Paid').reduce((a, c) => a + c.amount, 0), label: 'Paid' },
-                ].map((item, i) => (
-                  <React.Fragment key={item.label}>
-                    {i > 0 && <View style={s.commDiv} />}
-                    <View style={s.commItem}>
-                      <Icon name={item.iconName} size={22} color={item.color} style={{ marginBottom: 4 }} />
-                      <Text style={[s.commVal, { color: item.color }]}>₹{item.val.toLocaleString()}</Text>
-                      <Text style={s.commLabel}>{item.label}</Text>
-                    </View>
-                  </React.Fragment>
-                ))}
-              </View>
-            </View>
-
-            {/* Recent Commission Records */}
-            <View style={s.card}>
-              <Text style={s.cardTitle}>Recent Commission Records</Text>
-              {commissionHistory.slice(0, 5).map((item, i) => (
-                <View key={item.id}>
-                  <View style={s.commRecord}>
-                    <View style={s.commRecordIconBox}>
-                      <Icon name={Icons.commission} size={19} color={colors.success} />
-                    </View>
-                    <View style={s.commRecordInfo}>
-                      <Text style={s.commRecordName}>{item.fromName}</Text>
-                      <Text style={s.commRecordMeta}>{item.level} · {item.percentage}% · {item.date}</Text>
-                    </View>
-                    <View style={s.commRecordRight}>
-                      <Text style={s.commRecordAmt}>₹{item.amount.toLocaleString()}</Text>
-                      <StatusChip status={item.status} />
-                    </View>
-                  </View>
-                  {i < 4 && <Divider />}
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {activeTab === 'payout' && (
-          <>
-            <View style={s.banner}>
-              <View style={s.bannerLeft}>
-                <Text style={s.bannerLabel}>Total Paid Out</Text>
-                <Text style={s.bannerVal}>₹{totalPaid.toLocaleString()}</Text>
-              </View>
-              {payoutHistory.find(p => p.status === 'Processing') && (
                 <View style={s.bannerRight}>
-                  <Text style={s.bannerLabel}>Processing</Text>
-                  <Text style={[s.bannerValSm, { color: colors.warning }]}>₹{payoutHistory.find(p => p.status === 'Processing').commissionEarned.toLocaleString()}</Text>
+                  <Text style={s.bannerLabel}>My Self Business</Text>
+                  <Text style={s.bannerValSm}>₹{selfBusiness.toLocaleString()}</Text>
+                  <Text style={[s.bannerLabel, { marginTop: 8 }]}>Team Business</Text>
+                  <Text style={s.bannerValSm}>₹{totalGroupBusiness.toLocaleString()}</Text>
                 </View>
-              )}
-            </View>
+              </View>
 
-            <View style={s.card}>
-              <Text style={s.cardTitle}>Payout Cycles</Text>
-              <Text style={{ ...typography.bodySmall, color: colors.onSurfaceMuted, marginBottom: 8 }}>Cycle Type: {payoutPolicy.cycleType}</Text>
-              {payoutCycles?.map(cycle => (
-                <View key={cycle.id} style={s.cycleRow}>
-                  <Icon name={Icons.cycle} size={22} color={colors.primary} style={{ marginRight: 10 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.cycleName}>{cycle.name}</Text>
-                    <Text style={s.cycleDates}>{cycle.cycleStart} – {cycle.cycleEnd}</Text>
+              {/* Level Commission Breakdown */}
+              {levelBreakdown.length > 0 && (
+                <View style={s.card}>
+                  <Text style={s.cardTitle}>Level-wise Commission Structure</Text>
+                  <View style={s.levelTableHeader}>
+                    <Text style={[s.lth, { flex: 2 }]}>Level</Text>
+                    <Text style={[s.lth, { flex: 1, textAlign: 'center' }]}>Members</Text>
+                    <Text style={[s.lth, { flex: 2, textAlign: 'right' }]}>Business</Text>
+                    <Text style={[s.lth, { width: 80, textAlign: 'right' }]}>Commission</Text>
                   </View>
-                  <StatusChip status={cycle.status} />
-                </View>
-              ))}
-            </View>
-
-            {payoutHistory.map(item => (
-              <TouchableOpacity key={item.id} style={s.payoutCard} onPress={() => { setSelectedPayout(item); setShowPayoutDetail(true); }} activeOpacity={0.8}>
-                <View style={s.payoutCardHeader}>
-                  <View style={s.payoutCycleBox}>
-                    <Icon name={Icons.cycle} size={22} color={colors.primary} />
-                    <View>
-                      <Text style={s.payoutCycleLabel}>Payout Cycle</Text>
-                      <Text style={s.payoutCycleDates}>{item.cycleStart} – {item.cycleEnd}</Text>
-                    </View>
-                  </View>
-                  <StatusChip status={item.status} />
-                </View>
-                <Divider style={{ marginVertical: 10 }} />
-                <View style={s.payoutStatsRow}>
-                  <View style={s.payoutStatItem}><Text style={s.payoutStatLabel}>Total Business</Text><Text style={s.payoutStatVal}>₹{item.totalBusiness.toLocaleString()}</Text></View>
-                  <View style={s.payoutStatDiv} />
-                  <View style={s.payoutStatItem}><Text style={s.payoutStatLabel}>Commission</Text><Text style={[s.payoutStatVal, { color: colors.success }]}>₹{item.commissionEarned.toLocaleString()}</Text></View>
-                  <View style={s.payoutStatDiv} />
-                  <View style={s.payoutStatItem}><Text style={s.payoutStatLabel}>Net Payout</Text><Text style={[s.payoutStatVal, { color: colors.primary }]}>{item.netAmount ? `₹${item.netAmount.toLocaleString()}` : 'Pending'}</Text></View>
-                </View>
-                <View style={s.payoutLevelRow}>
-                  {item.levelBreakup.map((lb, i) => (
-                    <View key={i} style={s.payoutLevelItem}>
-                      <Text style={s.payoutLevelName}>{lb.level}</Text>
-                      <Text style={s.payoutLevelComm}>₹{lb.commission.toLocaleString()}</Text>
+                  {levelBreakdown.map((lv, i) => (
+                    <View key={lv.level || i}>
+                      <View style={[s.levelTableRow, i % 2 !== 0 && { backgroundColor: colors.background }]}>
+                        <Text style={[s.ltd, { flex: 2 }]}>{lv.levelLabel || lv.level}</Text>
+                        <Text style={[s.ltd, { flex: 1, textAlign: 'center' }]}>{lv.memberCount || lv.members || 0}</Text>
+                        <Text style={[s.ltd, { flex: 2, textAlign: 'right' }]}>₹{(lv.totalBusiness || lv.business || 0).toLocaleString()}</Text>
+                        <Text style={[s.ltd, { width: 80, textAlign: 'right', color: colors.success, fontWeight: '700' }]}>₹{(lv.totalCommission || lv.commission || 0).toLocaleString()}</Text>
+                      </View>
+                      {i < levelBreakdown.length - 1 && <Divider />}
                     </View>
                   ))}
                 </View>
-                {item.referenceNo && (
-                  <View style={s.payoutRefRow}>
-                    <Text style={s.payoutRefLabel}>Ref: </Text>
-                    <Text style={s.payoutRefVal}>{item.referenceNo}</Text>
+              )}
+
+              {/* Commission Summary */}
+              {commSummary && (
+                <View style={s.card}>
+                  <Text style={s.cardTitle}>Commission Summary</Text>
+                  <View style={s.commRow}>
+                    {[
+                      { iconName: Icons.pending,  color: colors.pending,      val: pendingComm, label: 'Pending' },
+                      { iconName: Icons.eligible, color: colors.primaryLight, val: commSummary?.approvedCommission || 0, label: 'Approved' },
+                      { iconName: Icons.paid,     color: colors.success,      val: commSummary?.paidCommission || 0, label: 'Paid' },
+                    ].map((item, i) => (
+                      <React.Fragment key={item.label}>
+                        {i > 0 && <View style={s.commDiv} />}
+                        <View style={s.commItem}>
+                          <Icon name={item.iconName} size={22} color={item.color} style={{ marginBottom: 4 }} />
+                          <Text style={[s.commVal, { color: item.color }]}>₹{item.val.toLocaleString()}</Text>
+                          <Text style={s.commLabel}>{item.label}</Text>
+                        </View>
+                      </React.Fragment>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          {activeTab === 'payout' && (
+            <>
+              <View style={s.banner}>
+                <View style={s.bannerLeft}>
+                  <Text style={s.bannerLabel}>Total Paid Out</Text>
+                  <Text style={s.bannerVal}>₹{totalPaid.toLocaleString()}</Text>
+                </View>
+                {payouts.find(p => p.status === 'Processing') && (
+                  <View style={s.bannerRight}>
+                    <Text style={s.bannerLabel}>Processing</Text>
+                    <Text style={[s.bannerValSm, { color: colors.warning }]}>
+                      ₹{(payouts.find(p => p.status === 'Processing').commissionEarned || 0).toLocaleString()}
+                    </Text>
                   </View>
                 )}
-                <Text style={s.viewDetailText}>View Full Details ›</Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-        <View style={{ height: 32 }} />
-      </ScrollView>
+              </View>
+
+              {payouts.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <Text style={{ fontSize: 40, marginBottom: 10 }}>💸</Text>
+                  <Text style={{ ...typography.bodyMedium, color: colors.onSurfaceMuted }}>No payout records yet</Text>
+                </View>
+              ) : (
+                payouts.map(item => (
+                  <TouchableOpacity key={item.id} style={s.payoutCard} onPress={() => { setSelectedPayout(item); setShowPayoutDetail(true); }} activeOpacity={0.8}>
+                    <View style={s.payoutCardHeader}>
+                      <View style={s.payoutCycleBox}>
+                        <Icon name={Icons.cycle} size={22} color={colors.primary} />
+                        <View>
+                          <Text style={s.payoutCycleLabel}>Payout Cycle</Text>
+                          <Text style={s.payoutCycleDates}>{item.cycleStart} – {item.cycleEnd}</Text>
+                        </View>
+                      </View>
+                      <StatusChip status={item.status} />
+                    </View>
+                    <Divider style={{ marginVertical: 10 }} />
+                    <View style={s.payoutStatsRow}>
+                      <View style={s.payoutStatItem}><Text style={s.payoutStatLabel}>Total Business</Text><Text style={s.payoutStatVal}>₹{(item.totalBusiness || 0).toLocaleString()}</Text></View>
+                      <View style={s.payoutStatDiv} />
+                      <View style={s.payoutStatItem}><Text style={s.payoutStatLabel}>Commission</Text><Text style={[s.payoutStatVal, { color: colors.success }]}>₹{(item.commissionEarned || 0).toLocaleString()}</Text></View>
+                      <View style={s.payoutStatDiv} />
+                      <View style={s.payoutStatItem}><Text style={s.payoutStatLabel}>Net Payout</Text><Text style={[s.payoutStatVal, { color: colors.primary }]}>{item.netAmount ? `₹${item.netAmount.toLocaleString()}` : 'Pending'}</Text></View>
+                    </View>
+                    {item.referenceNo && (
+                      <View style={s.payoutRefRow}>
+                        <Text style={s.payoutRefLabel}>Ref: </Text>
+                        <Text style={s.payoutRefVal}>{item.referenceNo}</Text>
+                      </View>
+                    )}
+                    <Text style={s.viewDetailText}>View Full Details ›</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </>
+          )}
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      )}
 
       <PayoutDetailModal visible={showPayoutDetail} item={selectedPayout} onClose={() => setShowPayoutDetail(false)} />
     </View>

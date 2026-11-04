@@ -1,43 +1,113 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Alert,
+  TouchableOpacity, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, PrimaryButton, Divider, LevelBadge, InfoRow, FormField } from '../../components';
 import Icon, { Icons } from '../../components/Icon';
-import { distributor } from '../../data/mockData';
+import { logout as logoutAction, updateProfile as updateProfileAction } from '../../redux/slice/userSlice';
+import { clearCachedToken } from '../../api/apiConfig';
+import { logout as logoutApi } from '../../api/auth';
+import { updateUserProfile } from '../../api/users';
 
 export default function ProfileScreen({ navigation }) {
+  const dispatch = useDispatch();
+  const { user } = useSelector(state => state.user);
   const [editMode, setEditMode] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [form, setForm] = useState({
-    name:    distributor.name,
-    mobile:  distributor.mobile,
-    email:   distributor.email,
-    address: distributor.address,
-    city:    distributor.city,
-    state:   distributor.state,
-    pincode: distributor.pincode,
+    name:    user?.name || user?.fullName || '',
+    mobile:  user?.mobile || user?.phone || '',
+    email:   user?.email || '',
+    address: user?.address || '',
+    city:    user?.city || '',
+    state:   user?.state || '',
+    pincode: user?.pincode || '',
   });
 
-  const handleSave = () => {
-    setEditMode(false);
-    Alert.alert('Success', 'Profile updated successfully.');
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  const handleSave = async () => {
+    const id = user?._id || user?.userId;
+    if (!id) { Alert.alert('Error', 'User ID not found'); return; }
+    setSaveLoading(true);
+    try {
+      const res = await updateUserProfile(id, {
+        name: form.name,
+        mobile: form.mobile,
+        email: form.email,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+      });
+      if (res.success) {
+        dispatch(updateProfileAction(form));
+        // Update AsyncStorage too
+        const stored = await AsyncStorage.getItem('userData');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          await AsyncStorage.setItem('userData', JSON.stringify({ ...parsed, ...form }));
+        }
+        setEditMode(false);
+        Alert.alert('Success', 'Profile updated successfully.');
+      } else {
+        Alert.alert('Error', res.message || 'Update failed');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Something went wrong.');
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const performLogout = async () => {
+    try {
+      setLogoutLoading(true);
+      // Optional API call to invalidate server session
+      await logoutApi();
+    } catch (_) {
+      // Ignore API error — local logout must still happen
+    } finally {
+      // Clear everything
+      await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('userData');
+      clearCachedToken();
+      dispatch(logoutAction()); // RootNavigation auto-switches to UnauthNavigation
+      setLogoutLoading(false);
+    }
   };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: () => navigation.replace('Login') },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: performLogout,
+      },
     ]);
   };
+
+  // Display values — fallback gracefully if user data missing
+  const displayName    = user?.name || user?.fullName || user?.userId || 'User';
+  const displayId      = user?.userId || user?.distributorId || '-';
+  const displayMobile  = user?.mobile || user?.phone || '-';
+  const displayEmail   = user?.email || '-';
+  const displayAddress = user?.address || '-';
+  const displayCity    = user?.city || '-';
+  const displayState   = user?.state || '-';
+  const displayPincode = user?.pincode || '-';
 
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="My Profile"
-        subtitle={distributor.id}
+        subtitle={displayId}
         rightIconName={editMode ? null : Icons.edit}
         onRightPress={() => setEditMode(true)}
       />
@@ -47,17 +117,17 @@ export default function ProfileScreen({ navigation }) {
         {/* Avatar Card */}
         <View style={s.avatarCard}>
           <View style={s.avatarCircle}>
-            <Text style={s.avatarLetter}>{distributor.name.charAt(0)}</Text>
+            <Text style={s.avatarLetter}>{displayName.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={s.avatarInfo}>
-            <Text style={s.avatarName}>{distributor.name}</Text>
-            <Text style={s.avatarId}>{distributor.id}</Text>
+            <Text style={s.avatarName}>{displayName}</Text>
+            <Text style={s.avatarId}>{displayId}</Text>
             <View style={s.rankRow}>
               <View style={s.rankChip}>
                 <Icon name={Icons.trophy} size={12} color={colors.white} />
-                <Text style={s.rankChipText}> {distributor.rank} Distributor</Text>
+                <Text style={s.rankChipText}> {user?.role || 'Distributor'}</Text>
               </View>
-              <LevelBadge level={distributor.level} size="sm" />
+              {user?.level && <LevelBadge level={user.level} size="sm" />}
             </View>
           </View>
         </View>
@@ -67,29 +137,34 @@ export default function ProfileScreen({ navigation }) {
           <View style={s.card}>
             <Text style={s.cardTitle}>Distributor Information</Text>
             <Divider style={{ marginBottom: 4 }} />
-            <InfoRow icon={Icons.idCard}   label="Distributor ID"    value={distributor.id} />
+            <InfoRow icon={Icons.idCard}   label="Distributor ID"    value={displayId} />
             <Divider />
-            <InfoRow icon={Icons.joinDate} label="Join Date"         value={distributor.joinDate} />
+            <InfoRow icon={Icons.joinDate} label="Join Date"         value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-IN') : '-'} />
             <Divider />
-            <InfoRow icon={Icons.upline}   label="Upline / Sponsor"  value={`${distributor.uplineName} (${distributor.uplineId})`} />
-            <Divider />
-            <InfoRow icon={Icons.level}    label="MLM Level"         value={distributor.level === 'A+' ? 'A+ (Admin-assigned)' : `Level ${distributor.level}`} />
+            {user?.uplineName && <>
+              <InfoRow icon={Icons.upline} label="Upline / Sponsor" value={`${user.uplineName}${user.uplineId ? ` (${user.uplineId})` : ''}`} />
+              <Divider />
+            </>}
+            {user?.level && <>
+              <InfoRow icon={Icons.level} label="MLM Level" value={user.level === 'A+' ? 'A+ (Admin-assigned)' : `Level ${user.level}`} />
+              <Divider />
+            </>}
 
             <Text style={[s.cardTitle, { marginTop: 20 }]}>Contact Information</Text>
             <Divider style={{ marginBottom: 4 }} />
-            <InfoRow icon={Icons.mobile} label="Mobile" value={distributor.mobile} />
+            <InfoRow icon={Icons.mobile} label="Mobile" value={displayMobile} />
             <Divider />
-            <InfoRow icon={Icons.email}  label="Email"  value={distributor.email} />
+            <InfoRow icon={Icons.email}  label="Email"  value={displayEmail} />
 
             <Text style={[s.cardTitle, { marginTop: 20 }]}>Address</Text>
             <Divider style={{ marginBottom: 4 }} />
-            <InfoRow icon={Icons.address} label="Address" value={distributor.address} />
+            <InfoRow icon={Icons.address} label="Address" value={displayAddress} />
             <Divider />
-            <InfoRow icon={Icons.city}    label="City"    value={distributor.city} />
+            <InfoRow icon={Icons.city}    label="City"    value={displayCity} />
             <Divider />
-            <InfoRow icon={Icons.state}   label="State"   value={distributor.state} />
+            <InfoRow icon={Icons.state}   label="State"   value={displayState} />
             <Divider />
-            <InfoRow icon={Icons.pincode} label="Pincode" value={distributor.pincode} />
+            <InfoRow icon={Icons.pincode} label="Pincode" value={displayPincode} />
           </View>
         ) : (
           <View style={s.card}>
@@ -107,15 +182,44 @@ export default function ProfileScreen({ navigation }) {
               <TouchableOpacity style={s.cancelBtn} onPress={() => setEditMode(false)}>
                 <Text style={s.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <PrimaryButton label="Save Changes" onPress={handleSave} style={{ flex: 1 }} />
+              <PrimaryButton label={saveLoading ? 'Saving...' : 'Save Changes'} onPress={handleSave} disabled={saveLoading} style={{ flex: 1 }} />
             </View>
           </View>
         )}
 
+        {/* Quick Links */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Settings</Text>
+          <Divider style={{ marginBottom: 4 }} />
+          {[
+            { icon: Icons.edit,     label: 'Change Password', screen: 'ChangePassword' },
+            { icon: 'file-sign',    label: 'Agreement',       screen: 'Agreement'      },
+            { icon: 'file-document-outline', label: 'Refund Policy', screen: 'RefundPolicy' },
+          ].map(({ icon, label, screen }) => (
+            <React.Fragment key={label}>
+              <TouchableOpacity
+                style={s.settingRow}
+                onPress={() => navigation.navigate(screen)}
+                activeOpacity={0.75}>
+                <Icon name={icon} size={20} color={colors.primary} style={{ marginRight: 12 }} />
+                <Text style={s.settingLabel}>{label}</Text>
+                <Icon name="chevron-right" size={20} color={colors.onSurfaceMuted} />
+              </TouchableOpacity>
+              <Divider />
+            </React.Fragment>
+          ))}
+        </View>
+
         {/* Logout */}
-        <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-          <Icon name={Icons.logout} size={18} color={colors.error} />
-          <Text style={s.logoutText}>Logout</Text>
+        <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} disabled={logoutLoading}>
+          {logoutLoading ? (
+            <ActivityIndicator size="small" color={colors.error} />
+          ) : (
+            <>
+              <Icon name={Icons.logout} size={18} color={colors.error} />
+              <Text style={s.logoutText}>Logout</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <View style={{ height: 32 }} />
@@ -182,6 +286,9 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   cancelBtnText: { ...typography.titleSmall, color: colors.onSurfaceVariant },
+
+  settingRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  settingLabel:  { ...typography.bodyMedium, color: colors.onSurface, flex: 1 },
 
   logoutBtn: {
     backgroundColor: colors.errorContainer,

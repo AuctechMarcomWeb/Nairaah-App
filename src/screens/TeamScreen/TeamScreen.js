@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, TextInput,
-  Modal, FlatList, Linking, Alert,
+  Modal, FlatList, Linking, Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, Divider, StatusChip, LevelBadge } from '../../components';
 import Icon, { Icons } from '../../components/Icon';
-import { distributor, teamMembers } from '../../data/mockData';
 import { LEVEL_LABELS, LEVEL_COLORS } from '../../constants/levels';
+import { getMyTeam, getDownlineUsers } from '../../api/team';
 
 // ── Phone call helper ─────────────────────────────────────
 function makeCall(mobile) {
@@ -28,15 +29,6 @@ function flattenByLevel(members, currentLevel) {
   });
   return result;
 }
-
-const allFlat = flattenByLevel(teamMembers, 1);
-// LEVEL_LABELS and LEVEL_COLORS imported from ../constants/levels
-const levelGroups = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(lvl => ({
-  level: lvl,
-  label: LEVEL_LABELS[lvl],
-  color: LEVEL_COLORS[lvl],
-  members: allFlat.filter(m => m.level === lvl),
-})).filter(g => g.members.length > 0);
 
 // ── Member Detail Modal (center) ──────────────────────────
 function MemberDetailModal({ visible, member, onClose, onViewDownline }) {
@@ -81,7 +73,7 @@ function MemberDetailModal({ visible, member, onClose, onViewDownline }) {
           {/* Other details */}
           {[
             [Icons.idCard,   'Distributor ID', member.id],
-            [Icons.upline,   'Referrer',        distributor.name],
+            [Icons.upline,   'Referrer',        member.uplineName || member.sponsorName || member.referredBy || '-'],
             [Icons.joinDate, 'Join Date',        member.joinDate],
             [Icons.payout,   'Total Business',  `₹${member.totalBusiness.toLocaleString()}`],
             [Icons.commission,'Total Earning',  `₹${member.totalEarning.toLocaleString()}`],
@@ -102,7 +94,7 @@ function MemberDetailModal({ visible, member, onClose, onViewDownline }) {
           <Divider style={{ marginVertical: 14 }} />
 
           {/* View Downline button — only if member has children */}
-          {findMemberNode(teamMembers, member.id)?.children?.length > 0 && (
+          {findMemberNode(teamData, member.id)?.children?.length > 0 && (
             <TouchableOpacity style={detailMd.downlineBtn} onPress={onViewDownline}>
               <Icon name={Icons.downline} size={18} color={colors.primary} />
               <Text style={detailMd.downlineBtnText}>
@@ -385,7 +377,7 @@ function MemberRow({ item, lc, hasKids, onDrillIn }) {
   );
 }
 
-function MemberDownlineModal({ visible, member, onClose }) {
+function MemberDownlineModal({ visible, member, onClose, treeData = [] }) {
   const [navStack, setNavStack] = useState([]);
   const [search, setSearch] = useState('');
 
@@ -396,7 +388,7 @@ function MemberDownlineModal({ visible, member, onClose }) {
   if (!visible || navStack.length === 0) return null;
 
   const currentRoot = navStack[navStack.length - 1];
-  const fullNode = findMemberNode(teamMembers, currentRoot.id);
+  const fullNode = findMemberNode(treeData, currentRoot.id);
   const children = fullNode?.children || [];
   const subtreeFlat = flattenSubtree(children, 1);
 
@@ -485,7 +477,7 @@ function MemberDownlineModal({ visible, member, onClose }) {
                     ? <Text style={{ ...typography.bodySmall, color: colors.onSurfaceMuted, padding: spacing.md }}>No members match</Text>
                     : searchFiltered.map((item, idx) => {
                         const lc = REL_LEVEL_COLORS[item.relativeLevel] || colors.primary;
-                        const hasKids = (findMemberNode(teamMembers, item.id)?.children?.length || 0) > 0;
+                        const hasKids = (findMemberNode(treeData, item.id)?.children?.length || 0) > 0;
                         return (
                           <View key={item.id}>
                             <MemberRow item={item} lc={lc} hasKids={hasKids} onDrillIn={drillInto} />
@@ -506,7 +498,7 @@ function MemberDownlineModal({ visible, member, onClose }) {
                         <Text style={[dlMd.levelCount, { color: lc }]}>{group.members.length} member{group.members.length !== 1 ? 's' : ''}</Text>
                       </View>
                       {group.members.map((item, idx) => {
-                        const hasKids = (findMemberNode(teamMembers, item.id)?.children?.length || 0) > 0;
+                        const hasKids = (findMemberNode(treeData, item.id)?.children?.length || 0) > 0;
                         return (
                           <View key={item.id}>
                             <MemberRow item={item} lc={lc} hasKids={hasKids} onDrillIn={drillInto} />
@@ -575,27 +567,79 @@ const dlMd = StyleSheet.create({
 
 
 export default function TeamScreen({ navigation }) {
+  const { user } = useSelector(state => state.user);
+  const [apiTeamMembers, setApiTeamMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchTeam = useCallback(async () => {
+    const id = user?._id || user?.userId;
+    if (!id) return;
+    try {
+      const res = await getDownlineUsers(id);
+      if (res.success) {
+        // Normalize API response to match expected UI shape
+        const normalize = (members) => (members || []).map(m => ({
+          ...m,
+          id: m._id || m.userId,
+          name: m.name || m.fullName || m.userId || 'Unknown',
+          mobile: m.mobile || m.phone || '-',
+          joinDate: m.joinDate || (m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-IN') : '-'),
+          isActive: m.isActive ?? m.status === 'Active' ?? true,
+          totalBusiness: m.totalBusiness || m.groupBusiness || 0,
+          totalEarning: m.totalEarning || m.totalCommission || 0,
+          mlmLevel: m.level || m.mlmLevel || '-',
+          children: normalize(m.children || m.downline || []),
+        }));
+        setApiTeamMembers(normalize(res.data?.downline || res.data || []));
+      }
+    } catch (e) {
+      console.error('[TEAM SCREEN] fetch error:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchTeam();
+      setLoading(false);
+    })();
+  }, [fetchTeam]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTeam();
+    setRefreshing(false);
+  };
+
+  // Use API data, fallback to empty
+  const teamData = apiTeamMembers;
+  const allFlat = flattenByLevel(teamData, 1);
+
   // ── viewStack: each item = { root, members }
   // root = null means "self" (distributor), members = direct downline
-  const [viewStack, setViewStack] = useState([
-    { root: null, members: teamMembers }
-  ]);
+  const [viewStack, setViewStack] = useState([{ root: null, members: [] }]);
+
+  // Update viewStack root when teamData loads
+  useEffect(() => {
+    setViewStack([{ root: null, members: teamData }]);
+  }, [apiTeamMembers]);
+
   const [globalSearch, setGlobalSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
 
   const currentView = viewStack[viewStack.length - 1];
-  const currentRoot = currentView.root; // null = self
+  const currentRoot = currentView.root;
   const currentMembers = currentView.members;
 
   const totalMembers = allFlat.length;
   const activeMembers = allFlat.filter(m => m.isActive).length;
-  const totalBusiness = allFlat.reduce((a, m) => a + m.totalBusiness, 0);
+  const totalBusiness = allFlat.reduce((a, m) => a + (m.totalBusiness || 0), 0);
 
   const canGoBack = viewStack.length > 1;
 
-  // Flatten current view's members by level
   const currentFlat = flattenSubtree(currentMembers, 1);
   const maxLevel = currentFlat.length > 0 ? Math.max(...currentFlat.map(m => m.relativeLevel)) : 0;
   const currentLevelGroups = [];
@@ -609,17 +653,15 @@ export default function TeamScreen({ navigation }) {
     });
   }
 
-  // Search across ALL members always
   const searchResults = globalSearch.trim().length > 1
     ? allFlat.filter(m =>
-        m.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
-        m.id.toLowerCase().includes(globalSearch.toLowerCase()) ||
-        m.mobile.includes(globalSearch))
+        (m.name || '').toLowerCase().includes(globalSearch.toLowerCase()) ||
+        (m.id || '').toLowerCase().includes(globalSearch.toLowerCase()) ||
+        (m.mobile || '').includes(globalSearch))
     : [];
 
-  // Click on a member in the table → they become the new root
   const drillInto = (member) => {
-    const fullNode = findMemberNode(teamMembers, member.id);
+    const fullNode = findMemberNode(teamData, member.id);
     const children = fullNode?.children || [];
     setViewStack(prev => [...prev, { root: member, members: children }]);
     setGlobalSearch('');
@@ -634,10 +676,9 @@ export default function TeamScreen({ navigation }) {
     setShowDetail(true);
   };
 
-  // Breadcrumb path
   const breadcrumb = viewStack
     .filter(v => v.root !== null)
-    .map(v => v.root.name.split(' ')[0])
+    .map(v => (v.root.name || '').split(' ')[0])
     .join(' › ');
 
   return (
@@ -694,11 +735,11 @@ export default function TeamScreen({ navigation }) {
               <Text style={s.uplineLabel}>Your Upline / Sponsor</Text>
               <View style={s.uplineRow}>
                 <View style={[s.uplineAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={s.uplineAvatarText}>{distributor.uplineName.charAt(0)}</Text>
+                  <Text style={s.uplineAvatarText}>{(user?.uplineName || user?.sponsorName || 'U').charAt(0)}</Text>
                 </View>
                 <View>
-                  <Text style={s.uplineName}>{distributor.uplineName}</Text>
-                  <Text style={s.uplineId}>{distributor.uplineId}</Text>
+                  <Text style={s.uplineName}>{user?.uplineName || user?.sponsorName || 'N/A'}</Text>
+                  <Text style={s.uplineId}>{user?.uplineId || user?.sponsorId || '-'}</Text>
                 </View>
               </View>
             </>
@@ -759,7 +800,7 @@ export default function TeamScreen({ navigation }) {
               <Text style={s.noResultText}>No members match your search</Text>
             ) : searchResults.map((item, idx) => {
               const lc = LEVEL_COLORS[item.level] || colors.primary;
-              const hasKids = (findMemberNode(teamMembers, item.id)?.children?.length || 0) > 0;
+              const hasKids = (findMemberNode(teamData, item.id)?.children?.length || 0) > 0;
               return (
                 <View key={item.id}>
                   <TouchableOpacity
@@ -818,7 +859,7 @@ export default function TeamScreen({ navigation }) {
                 {/* Members — horizontal chips, each tappable */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.memberChips}>
                   {group.members.map(m => {
-                    const hasKids = (findMemberNode(teamMembers, m.id)?.children?.length || 0) > 0;
+                    const hasKids = (findMemberNode(teamData, m.id)?.children?.length || 0) > 0;
                     return (
                       <TouchableOpacity
                         key={m.id}

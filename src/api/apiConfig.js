@@ -1,7 +1,12 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://api.nairaah.in/api';
+// ─── API BASE URL ─────────────────────────────────────────────────────────────
+// Agar machine ka IP change ho to sirf LOCAL_IP update karo
+// Current machine IP: 192.168.1.36  |  Backend port: 5002
+//
+// const BASE_URL = 'https://api.nairaah.in/api';   // ← production
+const BASE_URL = 'http://192.168.1.36:5002/api';    // ← local dev
 
 let _cachedToken = null;
 
@@ -48,7 +53,7 @@ export const createAxiosInstance = (endpoint = '') => {
     error => Promise.reject(error),
   );
 
-  // Handle 401
+  // Handle 401 — clear everything including Redux state
   instance.interceptors.response.use(
     response => response,
     async error => {
@@ -56,6 +61,15 @@ export const createAxiosInstance = (endpoint = '') => {
         clearCachedToken();
         await AsyncStorage.removeItem('authToken');
         await AsyncStorage.removeItem('userData');
+
+        // Dispatch logout to Redux so RootNavigation switches to login
+        try {
+          const { default: store } = await import('../redux/store');
+          const { logout } = await import('../redux/slice/userSlice');
+          store.dispatch(logout());
+        } catch (e) {
+          console.log('Redux dispatch error on 401:', e);
+        }
       }
       return Promise.reject(error);
     },

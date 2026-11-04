@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Alert, Modal,
+  TouchableOpacity, StatusBar, Alert, Modal, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider, PrimaryButton, SearchBar, StatsBanner } from '../../components';
-import { customers } from '../../data/mockData';
+import { getMyCustomers, convertToDistributor } from '../../api/users';
 
 function CustomerCard({ item, onPress }) {
   return (
@@ -140,14 +141,59 @@ const dm = StyleSheet.create({
 });
 
 export default function CustomersScreen({ navigation }) {
+  const { user } = useSelector(state => state.user);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [selected, setSelected] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [converting, setConverting] = useState(false);
+
+  const fetchCustomers = useCallback(async () => {
+    const id = user?._id || user?.userId;
+    if (!id) return;
+    try {
+      const res = await getMyCustomers(id);
+      if (res.success) {
+        const normalized = (res.data?.users || res.data || []).map(c => ({
+          ...c,
+          id: c._id || c.userId,
+          name: c.name || c.fullName || c.userId || 'Unknown',
+          mobile: c.mobile || c.phone || '-',
+          email: c.email || '-',
+          address: c.address || '-',
+          city: c.city || '-',
+          joinDate: c.joinDate || (c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN') : '-'),
+          isActive: c.isActive ?? c.status === 'Active' ?? true,
+          totalOrders: c.totalOrders || 0,
+          totalSpent: c.totalSpent || c.totalPurchase || 0,
+        }));
+        setCustomers(normalized);
+      }
+    } catch (e) {
+      console.error('[CUSTOMERS SCREEN] fetch error:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchCustomers();
+      setLoading(false);
+    })();
+  }, [fetchCustomers]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchCustomers();
+    setRefreshing(false);
+  };
 
   const filtered = customers.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.id.toLowerCase().includes(search.toLowerCase()),
+    (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.id || '').toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleConvert = (customer) => {
@@ -157,7 +203,20 @@ export default function CustomersScreen({ navigation }) {
       `${customer.name} will be converted from Customer to Distributor. Continue?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Convert', onPress: () => Alert.alert('Success', `${customer.name} is now a Distributor!`) },
+        {
+          text: 'Convert',
+          onPress: async () => {
+            setConverting(true);
+            const res = await convertToDistributor(customer._id || customer.id);
+            setConverting(false);
+            if (res.success) {
+              Alert.alert('Success', `${customer.name} is now a Distributor!`);
+              fetchCustomers(); // Refresh list
+            } else {
+              Alert.alert('Error', res.message || 'Conversion failed');
+            }
+          },
+        },
       ],
     );
   };
@@ -173,7 +232,6 @@ export default function CustomersScreen({ navigation }) {
       />
 
       <View style={s.body}>
-        {/* Search */}
         <SearchBar
           value={search}
           onChangeText={setSearch}
@@ -184,32 +242,39 @@ export default function CustomersScreen({ navigation }) {
           style={s.searchBox}
         />
 
-        {/* Stats row */}
         <StatsBanner
           style={s.statsRow}
           items={[
             { label: 'Total',       value: customers.length },
             { label: 'Active',      value: customers.filter(c => c.isActive).length, color: colors.success },
-            { label: 'Total Spent', value: `₹${(customers.reduce((a, c) => a + c.totalSpent, 0) / 1000).toFixed(0)}K` },
+            { label: 'Total Spent', value: `₹${(customers.reduce((a, c) => a + (c.totalSpent || 0), 0) / 1000).toFixed(0)}K` },
           ]}
         />
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-          {filtered.map(c => (
-            <CustomerCard
-              key={c.id}
-              item={c}
-              onPress={() => { setSelected(c); setShowDetail(true); }}
-            />
-          ))}
-          {filtered.length === 0 && (
-            <View style={s.empty}>
-              <Text style={s.emptyIcon}>👤</Text>
-              <Text style={s.emptyText}>No customers found</Text>
-            </View>
-          )}
-          <View style={{ height: 24 }} />
-        </ScrollView>
+        {loading ? (
+          <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={s.scroll}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          >
+            {filtered.map(c => (
+              <CustomerCard
+                key={c.id}
+                item={c}
+                onPress={() => { setSelected(c); setShowDetail(true); }}
+              />
+            ))}
+            {filtered.length === 0 && (
+              <View style={s.empty}>
+                <Text style={s.emptyIcon}>👤</Text>
+                <Text style={s.emptyText}>No customers found</Text>
+              </View>
+            )}
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        )}
       </View>
 
       <DetailModal

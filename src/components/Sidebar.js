@@ -8,31 +8,35 @@ import {
   Image, ScrollView, Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, typography, radius, spacing } from '../themes';
 import Icon, { Icons } from './Icon';
-import { distributor } from '../data/mockData';
 import { LevelBadge } from './index';
 import { logout } from '../redux/slice/userSlice';
+import { clearCachedToken } from '../api/apiConfig';
 
 const { height: H } = Dimensions.get('window');
 
 // ── Sidebar nav items ───────────────────────────────────────
 const NAV_ITEMS = [
-  { label: 'Dashboard',    icon: 'view-dashboard-outline',    screen: 'Dashboard'         },
-  { label: 'Orders',       icon: 'receipt-outline',           screen: 'Orders'            },
-  { label: 'Team / Downline', icon: 'account-group-outline',  screen: 'Downline'          },
-  { label: 'Business & Payout', icon: 'briefcase-outline',    screen: 'BusinessPayout'    },
-  { label: 'My Profile',   icon: 'account-circle-outline',    screen: 'Profile'           },
+  { label: 'Dashboard',         icon: 'view-dashboard-outline',     screen: 'Dashboard'      },
+  { label: 'Orders',            icon: 'receipt-outline',            screen: 'SalesHistory'   },
+  { label: 'Team / Downline',   icon: 'account-group-outline',      screen: 'Team'           },
+  { label: 'Business & Payout', icon: 'briefcase-outline',          screen: 'BusinessPayout' },
+  { label: 'Payout History',    icon: 'wallet-outline',             screen: 'Payout'         },
+  { label: 'My Profile',        icon: 'account-circle-outline',     screen: 'Profile'        },
 ];
 
 const QUICK_ITEMS = [
-  { label: 'Add Member',   icon: 'account-plus-outline',      screen: 'AddMember'         },
-  { label: 'Customers',    icon: 'account-multiple-outline',  screen: 'Customers'         },
-  { label: 'Create Sale',  icon: 'cart-plus',                 screen: 'CreateSale'        },
-  { label: 'Products',     icon: 'package-variant-outline',   screen: 'Products'          },
-  { label: 'Commissions',  icon: 'cash-multiple',             screen: 'CommissionHistory' },
+  { label: 'Add Member',        icon: 'account-plus-outline',       screen: 'AddMember'      },
+  { label: 'Customers',         icon: 'account-multiple-outline',   screen: 'Customers'      },
+  { label: 'Create Sale',       icon: 'cart-plus',                  screen: 'CreateSale'     },
+  { label: 'Products',          icon: 'package-variant-outline',    screen: 'Products'       },
+  { label: 'Commission',        icon: 'cash-multiple',              screen: 'Commission'     },
+  { label: 'Change Password',   icon: 'lock-reset',                 screen: 'ChangePassword' },
+  { label: 'Agreement',         icon: 'file-sign',                  screen: 'Agreement'      },
+  { label: 'Refund Policy',     icon: 'file-document-outline',      screen: 'RefundPolicy'   },
 ];
 
 // ── Nav row ─────────────────────────────────────────────────
@@ -93,32 +97,23 @@ function SectionTitle({ label }) {
 // ══════════════════════════════════════════════════════════
 export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashboard' }) {
   const dispatch = useDispatch();
+  const { user } = useSelector(state => state.user);
+
+  const displayName = user?.name || user?.fullName || user?.userId || 'User';
+  const displayId   = user?.userId || user?.distributorId || '-';
+  const displayLevel = user?.level || null;
 
   const goTo = (screen) => {
     closeDrawer();
-    // Tab screens navigate within Main, stack screens navigate directly
-    const tabScreens = ['Dashboard', 'Orders', 'Downline', 'BusinessPayout', 'Profile'];
-    if (tabScreens.includes(screen)) {
-      navigation.navigate('Main');
-      // Small delay to let drawer close before tab switch
-      setTimeout(() => navigation.navigate(screen), 50);
-    } else {
-      navigation.navigate(screen);
-    }
+    navigation.navigate(screen);
   };
 
   const handleLogout = async () => {
     closeDrawer();
-    
-    // Clear Redux
-    dispatch(logout());
-    
-    // Clear AsyncStorage
     await AsyncStorage.removeItem('authToken');
     await AsyncStorage.removeItem('userData');
-    
-    // Navigate to Login - the token being cleared will trigger navigation automatically
-    setTimeout(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] }), 100);
+    clearCachedToken();
+    dispatch(logout()); // RootNavigation auto switches to UnauthNavigation
   };
 
   return (
@@ -149,14 +144,16 @@ export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashbo
         {/* User info */}
         <View style={s.userCard}>
           <View style={s.avatar}>
-            <Text style={s.avatarLetter}>{distributor.name.charAt(0)}</Text>
+            <Text style={s.avatarLetter}>{displayName.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.userName}>{distributor.name}</Text>
-            <Text style={s.userId}>{distributor.id}</Text>
-            <View style={{ marginTop: 5 }}>
-              <LevelBadge level={distributor.level} size="sm" />
-            </View>
+            <Text style={s.userName}>{displayName}</Text>
+            <Text style={s.userId}>{displayId}</Text>
+            {displayLevel && (
+              <View style={{ marginTop: 5 }}>
+                <LevelBadge level={displayLevel} size="sm" />
+              </View>
+            )}
           </View>
         </View>
 

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Modal,
+  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider } from '../../components';
 import Icon, { Icons } from '../../components/Icon';
-import { commissionHistory } from '../../data/mockData';
 import { UPLINE_LEVEL_COLORS } from '../../constants/levels';
+import { getMyCommissionSummary, getLevelCommissionSummary } from '../../api/commission';
 
 // ── Commission Card ───────────────────────────────────────
 function CommCard({ item, onPress }) {
@@ -132,19 +133,72 @@ const dm = StyleSheet.create({
 
 // ── Main Screen ───────────────────────────────────────────
 export default function CommissionScreen() {
+  const { user } = useSelector(state => state.user);
+  const [commissions, setCommissions] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [levelBreakdown, setLevelBreakdown] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState('All');
   const [selected, setSelected] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
 
+  const fetchData = useCallback(async () => {
+    const id = user?._id || user?.userId;
+    if (!id) return;
+    try {
+      const [summaryRes, levelRes] = await Promise.all([
+        getMyCommissionSummary(id),
+        getLevelCommissionSummary(id),
+      ]);
+      if (summaryRes.success) {
+        setSummary(summaryRes.data);
+        const logs = summaryRes.data?.commissions || summaryRes.data?.logs || [];
+        const normalized = logs.map(c => ({
+          ...c,
+          id: c._id,
+          fromName: c.fromName || c.fromDistributorId?.name || 'Unknown',
+          orderId: c.orderId || c.orderRef || c._id?.slice(-8),
+          date: c.date || (c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN') : ''),
+          level: c.levelLabel || c.level || '',
+          percentage: c.percentage || c.commissionPct || 0,
+          saleAmount: c.saleAmount || c.orderAmount || 0,
+          amount: c.amount || c.commissionAmount || 0,
+          status: c.status || 'Pending',
+        }));
+        setCommissions(normalized);
+      }
+      if (levelRes.success) {
+        setLevelBreakdown(levelRes.data?.levelSummary || levelRes.data || []);
+      }
+    } catch (e) {
+      console.error('[COMMISSION SCREEN] fetch error:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchData();
+      setLoading(false);
+    })();
+  }, [fetchData]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
+
   const filters = ['All', 'Pending', 'Eligible', 'Hold', 'Payout Generated', 'Paid', 'Cancelled'];
-  const filtered = commissionHistory.filter(c => filterStatus === 'All' || c.status === filterStatus);
+  const filtered = commissions.filter(c => filterStatus === 'All' || c.status === filterStatus);
 
-  const pending  = commissionHistory.filter(c => c.status === 'Pending').reduce((a, c) => a + c.amount, 0);
-  const eligible = commissionHistory.filter(c => c.status === 'Eligible').reduce((a, c) => a + c.amount, 0);
-  const hold     = commissionHistory.filter(c => c.status === 'Hold').reduce((a, c) => a + c.amount, 0);
-  const paid     = commissionHistory.filter(c => c.status === 'Paid').reduce((a, c) => a + c.amount, 0);
+  const pending  = commissions.filter(c => c.status === 'Pending').reduce((a, c) => a + (c.amount || 0), 0);
+  const eligible = commissions.filter(c => c.status === 'Eligible').reduce((a, c) => a + (c.amount || 0), 0);
+  const hold     = commissions.filter(c => c.status === 'Hold').reduce((a, c) => a + (c.amount || 0), 0);
+  const paid     = commissions.filter(c => c.status === 'Paid').reduce((a, c) => a + (c.amount || 0), 0);
 
-  const SUMMARY = [
+  const SUMMARY_ITEMS = [
     { iconName: Icons.pending,  color: colors.pending,      val: pending,  label: 'Pending'  },
     { iconName: Icons.eligible, color: colors.primaryLight, val: eligible, label: 'Eligible' },
     { iconName: Icons.hold,     color: colors.warning,      val: hold,     label: 'Hold'     },
@@ -154,74 +208,82 @@ export default function CommissionScreen() {
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
-      <AppHeader title="Commission History" subtitle={`${commissionHistory.length} records`} />
+      <AppHeader title="Commission History" subtitle={`${commissions.length} records`} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-
-        {/* Summary */}
-        <View style={s.summaryCard}>
-          {SUMMARY.map((item, i) => (
-            <React.Fragment key={item.label}>
-              {i > 0 && <View style={s.summaryDiv} />}
-              <View style={s.summaryItem}>
-                <Icon name={item.iconName} size={22} color={item.color} style={{ marginBottom: 4 }} />
-                <Text style={[s.summaryVal, { color: item.color }]}>₹{item.val.toLocaleString()}</Text>
-                <Text style={s.summaryLabel}>{item.label}</Text>
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
-
-        {/* Level Breakdown */}
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Commission by Upline Level</Text>
-          {['Direct Parent (1st Upline)', '2nd Upline', '3rd Upline', '4th Upline'].map((level) => {
-            const items = commissionHistory.filter(c => c.level === level);
-            const total = items.reduce((a, c) => a + c.amount, 0);
-            const maxAmt = commissionHistory.reduce((a, c) => a + c.amount, 0);
-            const barWidth = maxAmt > 0 ? (total / maxAmt) * 100 : 0;
-            return (
-              <View key={level} style={s.levelRow}>
-                <Text style={s.levelLabel} numberOfLines={2}>{level}</Text>
-                <View style={s.levelBarBg}>
-                  <View style={[s.levelBarFill, { width: `${barWidth}%` }]} />
+      {loading ? (
+        <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {/* Summary */}
+          <View style={s.summaryCard}>
+            {SUMMARY_ITEMS.map((item, i) => (
+              <React.Fragment key={item.label}>
+                {i > 0 && <View style={s.summaryDiv} />}
+                <View style={s.summaryItem}>
+                  <Icon name={item.iconName} size={22} color={item.color} style={{ marginBottom: 4 }} />
+                  <Text style={[s.summaryVal, { color: item.color }]}>₹{item.val.toLocaleString()}</Text>
+                  <Text style={s.summaryLabel}>{item.label}</Text>
                 </View>
-                <Text style={s.levelAmt}>₹{total.toLocaleString()}</Text>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* Filter chips */}
-        <View style={s.filterRow}>
-          {filters.map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[s.filterChip, filterStatus === f && s.filterChipActive]}
-              onPress={() => setFilterStatus(f)}>
-              <Text style={[s.filterText, filterStatus === f && s.filterTextActive]}>{f}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Commission list */}
-        {filtered.map(item => (
-          <CommCard
-            key={item.id}
-            item={item}
-            onPress={() => { setSelected(item); setShowDetail(true); }}
-          />
-        ))}
-
-        {filtered.length === 0 && (
-          <View style={s.empty}>
-            <Icon name={Icons.empty} size={48} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 10 }} />
-            <Text style={s.emptyText}>No commissions found</Text>
+              </React.Fragment>
+            ))}
           </View>
-        )}
 
-        <View style={{ height: 32 }} />
-      </ScrollView>
+          {/* Level Breakdown */}
+          {levelBreakdown.length > 0 && (
+            <View style={s.card}>
+              <Text style={s.cardTitle}>Commission by Level</Text>
+              {levelBreakdown.map((lvl) => {
+                const total = lvl.totalCommission || lvl.commission || 0;
+                const maxAmt = levelBreakdown.reduce((a, l) => a + (l.totalCommission || l.commission || 0), 0);
+                const barWidth = maxAmt > 0 ? (total / maxAmt) * 100 : 0;
+                return (
+                  <View key={lvl.level || lvl.label} style={s.levelRow}>
+                    <Text style={s.levelLabel} numberOfLines={2}>{lvl.levelLabel || lvl.level}</Text>
+                    <View style={s.levelBarBg}>
+                      <View style={[s.levelBarFill, { width: `${barWidth}%` }]} />
+                    </View>
+                    <Text style={s.levelAmt}>₹{Number(total).toLocaleString()}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Filter chips */}
+          <View style={s.filterRow}>
+            {filters.map(f => (
+              <TouchableOpacity
+                key={f}
+                style={[s.filterChip, filterStatus === f && s.filterChipActive]}
+                onPress={() => setFilterStatus(f)}>
+                <Text style={[s.filterText, filterStatus === f && s.filterTextActive]}>{f}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Commission list */}
+          {filtered.map(item => (
+            <CommCard
+              key={item.id}
+              item={item}
+              onPress={() => { setSelected(item); setShowDetail(true); }}
+            />
+          ))}
+
+          {filtered.length === 0 && (
+            <View style={s.empty}>
+              <Icon name={Icons.empty} size={48} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 10 }} />
+              <Text style={s.emptyText}>No commissions found</Text>
+            </View>
+          )}
+
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      )}
 
       <DetailModal visible={showDetail} item={selected} onClose={() => setShowDetail(false)} />
     </View>

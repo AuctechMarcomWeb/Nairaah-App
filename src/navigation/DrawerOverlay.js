@@ -17,6 +17,17 @@ export const DrawerOverlay = () => {
   const navigation = useNavigation();
   const { isOpen, closeDrawer } = useDrawer();
 
+  // Get current active route name safely — useRoute() crashes outside screen context
+  const getActiveRouteName = () => {
+    try {
+      const state = navigation.getState();
+      const route = state?.routes?.[state.index];
+      return route?.name || 'Dashboard';
+    } catch {
+      return 'Dashboard';
+    }
+  };
+
   return (
     <Modal
       visible={isOpen}
@@ -34,7 +45,7 @@ export const DrawerOverlay = () => {
         <Sidebar
           closeDrawer={closeDrawer}
           navigation={navigation}
-          activeRoute="Dashboard"
+          activeRoute={getActiveRouteName()}
         />
       </View>
     </Modal>

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Modal,
+  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider } from '../../components';
-import { payoutHistory } from '../../data/mockData';
+import { getMyPayouts } from '../../api/payout';
 
 function PayoutCard({ item, onPress }) {
   return (
@@ -90,13 +91,15 @@ function DetailModal({ visible, item, onClose }) {
           {/* PO Summary */}
           <Text style={dm.sectionLabel}>PO Summary</Text>
           {[
-            ['Old Balance', item.id === 'PAY-001' ? '₹10,000' : '₹8,000'],
-            ['Last Payout', item.id === 'PAY-001' ? '₹5,020' : '₹4,680'],
-            ['Total Business', `₹${item.totalBusiness.toLocaleString()}`],
-            ['Commission Earned', `₹${item.commissionEarned.toLocaleString()}`],
-            ['TDS (10%)', item.tds ? `-₹${item.tds.toLocaleString()}` : 'N/A'],
-            ['Net Payout', item.netAmount ? `₹${item.netAmount.toLocaleString()}` : 'Processing'],
-            ['Balance', '₹5,000'],
+            ['Period', item.periodKey || '—'],
+            ['Total Business', `₹${(item.totalBusiness || 0).toLocaleString()}`],
+            ['Direct Commission', `₹${(item.directCommission || 0).toLocaleString()}`],
+            ['Team Commission', `₹${(item.teamCommission || 0).toLocaleString()}`],
+            ['Commission Earned', `₹${(item.commissionEarned || 0).toLocaleString()}`],
+            ['Milestone Reward', `₹${(item.milestoneReward || 0).toLocaleString()}`],
+            ['TDS', item.tds ? `-₹${item.tds.toLocaleString()}` : 'N/A'],
+            ['Net Payout', item.netAmount ? `₹${item.netAmount.toLocaleString()}` : 'Pending'],
+            ['Payment Status', item.paymentStatus || item.status || '—'],
           ].map(([label, value]) => (
             <View key={label} style={dm.row}>
               <Text style={dm.rowLabel}>{label}</Text>
@@ -177,41 +180,102 @@ const dm = StyleSheet.create({
 });
 
 export default function PayoutScreen() {
+  const { user } = useSelector(state => state.user);
+  const [payouts, setPayouts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
 
-  const totalPaid = payoutHistory.filter(p => p.status === 'Paid').reduce((a, p) => a + (p.netAmount || 0), 0);
-  const processing = payoutHistory.find(p => p.status === 'Processing');
+  const fetchPayouts = useCallback(async () => {
+    const id = user?._id || user?.userId;
+    if (!id) return;
+    try {
+      const res = await getMyPayouts(id);
+      if (res.success) {
+        const normalized = (res.data?.payouts || res.data || []).map(p => ({
+          ...p,
+          id: p._id,
+          cycleStart: p.cycleStart || (p.periodFrom ? new Date(p.periodFrom).toLocaleDateString('en-IN') : ''),
+          cycleEnd: p.cycleEnd || (p.periodTo ? new Date(p.periodTo).toLocaleDateString('en-IN') : ''),
+          totalBusiness: p.totalBusiness || p.groupBusiness || 0,
+          commissionEarned: p.commissionEarned || p.totalCommission || 0,
+          netAmount: p.netAmount || p.payableAmount || null,
+          tds: p.tds || p.tdsAmount || null,
+          status: p.status || 'Pending',
+          levelBreakup: p.levelBreakup || p.levelWise || [],
+          referenceNo: p.referenceNo || p.transactionId || null,
+          bankName: p.bankName || '',
+          accountLast4: p.accountLast4 || '',
+          processedDate: p.processedDate || (p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN') : null),
+        }));
+        setPayouts(normalized);
+      }
+    } catch (e) {
+      console.error('[PAYOUT SCREEN] fetch error:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchPayouts();
+      setLoading(false);
+    })();
+  }, [fetchPayouts]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchPayouts();
+    setRefreshing(false);
+  };
+
+  const totalPaid = payouts.filter(p => p.status === 'Paid').reduce((a, p) => a + (p.netAmount || 0), 0);
+  const processing = payouts.find(p => p.status === 'Processing');
 
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
-      <AppHeader title="Payout History" subtitle={`${payoutHistory.length} cycles`} />
+      <AppHeader title="Payout History" subtitle={`${payouts.length} cycles`} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-        {/* Summary Banner */}
-        <View style={s.banner}>
-          <View style={s.bannerLeft}>
-            <Text style={s.bannerLabel}>Total Paid Out</Text>
-            <Text style={s.bannerVal}>₹{totalPaid.toLocaleString()}</Text>
-          </View>
-          {processing && (
-            <View style={s.bannerRight}>
-              <Text style={s.bannerLabel}>Processing</Text>
-              <Text style={[s.bannerVal, { color: colors.warning }]}>
-                ₹{processing.commissionEarned.toLocaleString()}
-              </Text>
+      {loading ? (
+        <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {/* Summary Banner */}
+          <View style={s.banner}>
+            <View style={s.bannerLeft}>
+              <Text style={s.bannerLabel}>Total Paid Out</Text>
+              <Text style={s.bannerVal}>₹{totalPaid.toLocaleString()}</Text>
             </View>
+            {processing && (
+              <View style={s.bannerRight}>
+                <Text style={s.bannerLabel}>Processing</Text>
+                <Text style={[s.bannerVal, { color: colors.warning }]}>
+                  ₹{(processing.commissionEarned || 0).toLocaleString()}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {payouts.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Text style={{ fontSize: 40, marginBottom: 10 }}>💸</Text>
+              <Text style={{ ...typography.bodyMedium, color: colors.onSurfaceMuted }}>No payout records yet</Text>
+            </View>
+          ) : (
+            payouts.map(item => (
+              <PayoutCard key={item.id} item={item} onPress={() => { setSelected(item); setShowDetail(true); }} />
+            ))
           )}
-        </View>
 
-        {/* Payout List */}
-        {payoutHistory.map(item => (
-          <PayoutCard key={item.id} item={item} onPress={() => { setSelected(item); setShowDetail(true); }} />
-        ))}
-
-        <View style={{ height: 32 }} />
-      </ScrollView>
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      )}
 
       <DetailModal visible={showDetail} item={selected} onClose={() => setShowDetail(false)} />
     </View>

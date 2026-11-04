@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import {
   View,
@@ -8,9 +8,12 @@ import {
   TouchableOpacity,
   StatusBar,
   Image,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
 
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 
@@ -23,21 +26,20 @@ import {
 
 import Icon, { Icons } from '../../components/Icon';
 import { useDrawer } from '../../navigation/DrawerContext';
-
-import {
-  distributor,
-  dashboardStats,
-  recentSales,
-  recentCommissions,
-  teamMembers,
-} from '../../data/mockData';
+import { getDistributorDashboard } from '../../api/dashboard';
+import { getMyOrders } from '../../api/orders';
+import { getMyCommissionSummary } from '../../api/commission';
 
 // ==============================
 // Recent Sale Row
 // ==============================
 
 function RecentSaleRow({ item, onPress }) {
-  const isDistributor = item.buyerType === 'Distributor';
+  const isDistributor = item.buyerType === 'Distributor' || item.buyerRole === 'Distributor';
+  const buyerName = item.buyerName || item.buyerId?.name || 'Unknown';
+  const amount = item.totalAmount || item.grandTotal || 0;
+  const status = item.paymentStatus || item.status || 'Pending';
+  const dateStr = item.date || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : '');
 
   return (
     <TouchableOpacity style={saleRow.row} onPress={onPress} activeOpacity={0.7}>
@@ -50,19 +52,17 @@ function RecentSaleRow({ item, onPress }) {
       </View>
 
       <View style={saleRow.info}>
-        <Text style={saleRow.name}>{item.buyerName}</Text>
-
+        <Text style={saleRow.name}>{buyerName}</Text>
         <Text style={saleRow.sub}>
-          {item.billNo} · {item.date}
+          {item.billNo || item.orderNumber || item._id?.slice(-6)} · {dateStr}
         </Text>
       </View>
 
       <View style={saleRow.right}>
         <Text style={saleRow.amount}>
-          ₹{item.totalAmount.toLocaleString('en-IN')}
+          ₹{Number(amount).toLocaleString('en-IN')}
         </Text>
-
-        <StatusChip status={item.paymentStatus} />
+        <StatusChip status={status} />
       </View>
     </TouchableOpacity>
   );
@@ -116,6 +116,13 @@ const saleRow = StyleSheet.create({
 // ==============================
 
 function RecentCommRow({ item }) {
+  const fromName = item.fromName || item.fromDistributorId?.name || 'Unknown';
+  const level = item.level || item.levelLabel || '';
+  const percentage = item.percentage || item.commissionPct || 0;
+  const amount = item.amount || item.commissionAmount || 0;
+  const status = item.status || 'Pending';
+  const dateStr = item.date || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : '');
+
   return (
     <View style={commRow.row}>
       <View style={commRow.iconBox}>
@@ -123,19 +130,17 @@ function RecentCommRow({ item }) {
       </View>
 
       <View style={commRow.info}>
-        <Text style={commRow.name}>{item.fromName}</Text>
-
+        <Text style={commRow.name}>{fromName}</Text>
         <Text style={commRow.sub}>
-          {item.level} · {item.percentage}% · {item.date}
+          {level} · {percentage}% · {dateStr}
         </Text>
       </View>
 
       <View style={commRow.right}>
         <Text style={commRow.amount}>
-          ₹{item.amount.toLocaleString('en-IN')}
+          ₹{Number(amount).toLocaleString('en-IN')}
         </Text>
-
-        <StatusChip status={item.status} />
+        <StatusChip status={status} />
       </View>
     </View>
   );
@@ -190,22 +195,55 @@ const commRow = StyleSheet.create({
 
 export default function DashboardScreen({ navigation }) {
   const { openDrawer } = useDrawer();
+  const { user } = useSelector(state => state.user);
 
-  const countAllDownline = members => {
-    let count = members.length;
+  const [stats, setStats] = useState(null);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [commSummary, setCommSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-    members.forEach(member => {
-      if (member.children && member.children.length > 0) {
-        count += countAllDownline(member.children);
-      }
-    });
+  const displayName = user?.name || user?.fullName || user?.userId || 'User';
+  const displayId   = user?.userId || '-';
 
-    return count;
+  const fetchDashboard = useCallback(async () => {
+    if (!user?._id && !user?.userId) return;
+    const id = user._id || user.userId;
+    try {
+      const [dashRes, ordersRes, commRes] = await Promise.all([
+        getDistributorDashboard(id),
+        getMyOrders('?limit=5'),
+        getMyCommissionSummary(id),
+      ]);
+      if (dashRes.success) setStats(dashRes.data);
+      if (ordersRes.success) setRecentOrders(ordersRes.data?.orders || ordersRes.data || []);
+      if (commRes.success) setCommSummary(commRes.data);
+    } catch (e) {
+      console.error('[DASHBOARD] fetch error:', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchDashboard();
+      setLoading(false);
+    })();
+  }, [fetchDashboard]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboard();
+    setRefreshing(false);
   };
 
-  const totalDownline = countAllDownline(teamMembers);
-
-  const directDistributors = teamMembers.length;
+  // Helper: get greeting by time
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -240,11 +278,9 @@ export default function DashboardScreen({ navigation }) {
           {/* User Information */}
 
           <View style={styles.userInfo}>
-            <Text style={styles.greeting}>Good morning</Text>
-
-            <Text style={styles.userName}>{distributor.name}</Text>
-
-            <Text style={styles.userId}>ID: {distributor.id}</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.userName}>{displayName}</Text>
+            <Text style={styles.userId}>ID: {displayId}</Text>
           </View>
 
           {/* Profile */}
@@ -254,116 +290,121 @@ export default function DashboardScreen({ navigation }) {
             onPress={() => navigation.navigate('Profile')}
             activeOpacity={0.7}
           >
-            <Text style={styles.avatarText}>{distributor.name.charAt(0)}</Text>
+            <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Dashboard Scroll */}
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Statistics Grid */}
-
-          <View style={styles.statsGrid}>
-            <SummaryCard
-              label="Total Sales"
-              value={`₹${(dashboardStats.totalSales / 1000).toFixed(0)}K`}
-              iconName={Icons.sale}
-              accentColor={colors.primary}
-              containerColor={colors.primaryContainer}
-            />
-
-            <SummaryCard
-              label="Total Commission"
-              value={`₹${(dashboardStats.totalCommission / 1000).toFixed(1)}K`}
-              iconName={Icons.commission}
-              accentColor={colors.success}
-              containerColor={colors.successContainer}
-            />
-
-            <SummaryCard
-              label="Total Downline"
-              value={totalDownline}
-              iconName={Icons.downline}
-              accentColor={colors.primary}
-              containerColor={colors.primaryContainer}
-            />
-
-            <SummaryCard
-              label="Direct Distributors"
-              value={directDistributors}
-              iconName={Icons.distributor}
-              accentColor={colors.primaryLight}
-              containerColor={colors.primaryContainer}
-            />
-
-            <SummaryCard
-              label="Pending"
-              value={`₹${dashboardStats.pendingCommission.toLocaleString(
-                'en-IN',
-              )}`}
-              iconName={Icons.pending}
-              accentColor={colors.pending}
-              containerColor={colors.pendingContainer}
-            />
-
-            <SummaryCard
-              label="Paid Out"
-              value={`₹${(dashboardStats.paidCommission / 1000).toFixed(1)}K`}
-              iconName={Icons.paid}
-              accentColor={colors.success}
-              containerColor={colors.successContainer}
-            />
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          >
+            {/* Statistics Grid */}
 
-          {/* Recent Sales */}
+            <View style={styles.statsGrid}>
+              <SummaryCard
+                label="Total Sales"
+                value={stats?.totalSales != null ? `₹${(stats.totalSales / 1000).toFixed(0)}K` : '—'}
+                iconName={Icons.sale}
+                accentColor={colors.primary}
+                containerColor={colors.primaryContainer}
+              />
 
-          <View style={styles.card}>
-            <SectionHeader
-              title="Recent Sales"
-              actionLabel="See All"
-              onAction={() => navigation.navigate('SalesHistory')}
-            />
+              <SummaryCard
+                label="Total Commission"
+                value={commSummary?.totalCommission != null ? `₹${(commSummary.totalCommission / 1000).toFixed(1)}K` : '—'}
+                iconName={Icons.commission}
+                accentColor={colors.success}
+                containerColor={colors.successContainer}
+              />
 
-            {recentSales.map((item, index) => (
-              <View key={item.id}>
-                <RecentSaleRow
-                  item={item}
-                  onPress={() =>
-                    navigation.navigate('SaleDetail', {
-                      sale: item,
-                    })
-                  }
+              <SummaryCard
+                label="Total Downline"
+                value={stats?.totalDownline ?? '—'}
+                iconName={Icons.downline}
+                accentColor={colors.primary}
+                containerColor={colors.primaryContainer}
+              />
+
+              <SummaryCard
+                label="Direct Members"
+                value={stats?.directMembers ?? '—'}
+                iconName={Icons.distributor}
+                accentColor={colors.primaryLight}
+                containerColor={colors.primaryContainer}
+              />
+
+              <SummaryCard
+                label="Pending"
+                value={commSummary?.pendingCommission != null ? `₹${commSummary.pendingCommission.toLocaleString('en-IN')}` : '—'}
+                iconName={Icons.pending}
+                accentColor={colors.pending}
+                containerColor={colors.pendingContainer}
+              />
+
+              <SummaryCard
+                label="Paid Out"
+                value={commSummary?.paidCommission != null ? `₹${(commSummary.paidCommission / 1000).toFixed(1)}K` : '—'}
+                iconName={Icons.paid}
+                accentColor={colors.success}
+                containerColor={colors.successContainer}
+              />
+            </View>
+
+            {/* Recent Orders */}
+
+            <View style={styles.card}>
+              <SectionHeader
+                title="Recent Orders"
+                actionLabel="See All"
+                onAction={() => navigation.navigate('SalesHistory')}
+              />
+
+              {recentOrders.length === 0 ? (
+                <Text style={styles.emptyText}>No recent orders</Text>
+              ) : (
+                recentOrders.map((item, index) => (
+                  <View key={item._id || index}>
+                    <RecentSaleRow
+                      item={item}
+                      onPress={() => navigation.navigate('SalesHistory')}
+                    />
+                    {index < recentOrders.length - 1 && <Divider />}
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Recent Commission */}
+
+            {commSummary?.recentCommissions?.length > 0 && (
+              <View style={styles.card}>
+                <SectionHeader
+                  title="Recent Commission"
+                  actionLabel="See All"
+                  onAction={() => navigation.navigate('Commission')}
                 />
 
-                {index < recentSales.length - 1 && <Divider />}
+                {commSummary.recentCommissions.map((item, index) => (
+                  <View key={item._id || index}>
+                    <RecentCommRow item={item} />
+                    {index < commSummary.recentCommissions.length - 1 && <Divider />}
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            )}
 
-          {/* Recent Commission */}
-
-          <View style={styles.card}>
-            <SectionHeader
-              title="Recent Commission"
-              actionLabel="See All"
-              onAction={() => navigation.navigate('CommissionHistory')}
-            />
-
-            {recentCommissions.map((item, index) => (
-              <View key={item.id}>
-                <RecentCommRow item={item} />
-
-                {index < recentCommissions.length - 1 && <Divider />}
-              </View>
-            ))}
-          </View>
-
-          <View style={{ height: 24 }} />
-        </ScrollView>
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -483,5 +524,12 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: 12,
     ...elevation.level1,
+  },
+
+  emptyText: {
+    ...typography.bodyMedium,
+    color: colors.onSurfaceMuted,
+    textAlign: 'center',
+    paddingVertical: 16,
   },
 });

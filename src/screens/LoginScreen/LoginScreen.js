@@ -57,12 +57,15 @@ export default function LoginScreen({ navigation }) {
     try {
       // 1️⃣ Set loading
       dispatch(setLoading(true));
+      console.log('[LOGIN] Attempting login for userId:', userId);
 
       // 2️⃣ Call API
       const result = await loginWithPassword(userId, password);
+      console.log('[LOGIN] API result:', JSON.stringify(result, null, 2));
 
       // 3️⃣ Handle response
       if (result.success) {
+        console.log('[LOGIN] Success! Token:', result.token ? result.token.substring(0, 20) + '...' : 'NULL');
         // Save to AsyncStorage
         await AsyncStorage.setItem('authToken', result.token);
         await AsyncStorage.setItem('userData', JSON.stringify(result.user));
@@ -77,10 +80,12 @@ export default function LoginScreen({ navigation }) {
 
         // Navigation happens automatically in RootNavigation
       } else {
+        console.log('[LOGIN] Failed:', result.message);
         // API error
         dispatch(loginError(result.message || 'Login failed'));
       }
     } catch (err) {
+      console.log('[LOGIN] Exception caught:', err.message, err);
       dispatch(loginError(err.message || 'Something went wrong'));
     }
   };
