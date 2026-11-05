@@ -94,3 +94,39 @@ export const getOrderCommissionBreakdown = async (distributorId, fromDate = '', 
     return { success: false, message: error.response?.data?.message || error.message };
   }
 };
+
+/**
+ * GET /api/commission/my/summary
+ * Returns distributor's commission summary (token-resolved, no id needed)
+ * Response shape: { overall: { totalEarning, pendingEarning, paidEarning }, levelWiseSummary: [] }
+ */
+export const getMyCommissionSummaryByToken = async () => {
+  try {
+    const response = await commissionApi.get('/my/summary');
+    if (response.data.success) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, message: response.data.message };
+  } catch (error) {
+    console.error('[COMMISSION] getMyCommissionSummaryByToken error:', error.message);
+    return { success: false, message: error.response?.data?.message || error.message };
+  }
+};
+
+/**
+ * GET /api/commission-slab
+ * Returns commission slabs (for "How ₹100 flows" section)
+ */
+export const getCommissionSlabs = async () => {
+  try {
+    const slabApi = createAxiosInstance('commission-slab');
+    const response = await slabApi.get('?page=1&limit=50&sortBy=order&isPagination=true');
+    if (response.data.success) {
+      return { success: true, data: response.data.data };
+    }
+    return { success: false, message: response.data.message };
+  } catch (error) {
+    console.error('[COMMISSION] getCommissionSlabs error:', error.message);
+    return { success: false, message: error.response?.data?.message || error.message };
+  }
+};

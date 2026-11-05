@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import Icon, { Icons } from '../../components/Icon';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   StatusBar, Modal, FlatList, ActivityIndicator,
