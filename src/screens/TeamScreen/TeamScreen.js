@@ -192,7 +192,7 @@ function MembersListModal({ visible, group, onClose, onMemberPress }) {
 
           {/* Search */}
           <View style={listMd.searchBox}>
-            <Text style={listMd.searchIcon}>🔍</Text>
+            <Icon name={Icons.search} size={16} color={colors.onSurfaceMuted} style={{ marginLeft: 10 }} />
             <TextInput
               style={listMd.searchInput}
               placeholder="Search name, ID or mobile..."
@@ -203,7 +203,7 @@ function MembersListModal({ visible, group, onClose, onMemberPress }) {
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch('')}>
-                <Text style={listMd.clearBtn}>✕</Text>
+                <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} style={{ marginRight: 8 }} />
               </TouchableOpacity>
             )}
           </View>
@@ -219,7 +219,7 @@ function MembersListModal({ visible, group, onClose, onMemberPress }) {
             ItemSeparatorComponent={() => <Divider />}
             ListEmptyComponent={
               <View style={listMd.empty}>
-                <Text style={listMd.emptyIcon}>🔍</Text>
+                <Icon name={Icons.emptySearch} size={40} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 6 }} />
                 <Text style={listMd.emptyText}>No members found</Text>
               </View>
             }
@@ -244,7 +244,7 @@ function MembersListModal({ visible, group, onClose, onMemberPress }) {
                   <TouchableOpacity
                     style={listMd.callMiniBtn}
                     onPress={() => makeCall(item.mobile)}>
-                    <Text style={listMd.callMiniIcon}>📞</Text>
+                    <Icon name={Icons.phone} size={14} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -364,11 +364,11 @@ function MemberRow({ item, lc, hasKids, onDrillIn }) {
         <StatusChip status={item.isActive ? 'Active' : 'Inactive'} />
         <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
           <TouchableOpacity style={dlMd.callBtn} onPress={() => makeCall(item.mobile)}>
-            <Text style={{ fontSize: 14 }}>📞</Text>
+            <Icon name={Icons.phone} size={14} color={colors.primary} />
           </TouchableOpacity>
           {hasKids && (
             <TouchableOpacity style={dlMd.drillBtn} onPress={() => onDrillIn(item)}>
-              <Text style={dlMd.drillBtnText}>›</Text>
+              <Icon name={Icons.chevronRight} size={18} color={colors.primary} />
             </TouchableOpacity>
           )}
         </View>
@@ -418,7 +418,7 @@ function MemberDownlineModal({ visible, member, onClose, treeData = [] }) {
           <View style={dlMd.header}>
             {navStack.length > 1 ? (
               <TouchableOpacity style={dlMd.backBtn} onPress={goBack}>
-                <Text style={dlMd.backBtnText}>‹</Text>
+                <Icon name={Icons.back} size={22} color={colors.primary} />
               </TouchableOpacity>
             ) : (
               <View style={dlMd.headerAvatar}>
@@ -441,13 +441,13 @@ function MemberDownlineModal({ visible, member, onClose, treeData = [] }) {
               </Text>
             </View>
             <TouchableOpacity onPress={handleClose} style={dlMd.xBtn}>
-              <Text style={dlMd.xBtnText}>✕</Text>
+              <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} />
             </TouchableOpacity>
           </View>
 
           {/* Search */}
           <View style={dlMd.searchBox}>
-            <Text style={dlMd.searchIcon}>🔍</Text>
+            <Icon name={Icons.search} size={15} color={colors.onSurfaceMuted} style={{ marginLeft: 10 }} />
             <TextInput
               style={dlMd.searchInput}
               placeholder="Search members..."
@@ -457,7 +457,7 @@ function MemberDownlineModal({ visible, member, onClose, treeData = [] }) {
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch('')}>
-                <Text style={dlMd.clearBtn}>✕</Text>
+                <Icon name={Icons.close} size={14} color={colors.onSurfaceMuted} style={{ marginRight: 8 }} />
               </TouchableOpacity>
             )}
           </View>
@@ -465,7 +465,7 @@ function MemberDownlineModal({ visible, member, onClose, treeData = [] }) {
           {/* Empty */}
           {children.length === 0 ? (
             <View style={dlMd.emptyBox}>
-              <Text style={dlMd.emptyIcon}>👤</Text>
+              <Icon name={Icons.emptyUser} size={36} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 6 }} />
               <Text style={dlMd.emptyText}>{currentRoot.name.split(' ')[0]} has no downline yet.</Text>
             </View>
           ) : (
@@ -697,7 +697,7 @@ export default function TeamScreen({ navigation }) {
         {/* Back bar — shown when drilled in */}
         {canGoBack && (
           <TouchableOpacity style={s.backBar} onPress={goBack}>
-            <Text style={s.backBarArrow}>‹</Text>
+            <Icon name={Icons.back} size={20} color={colors.primary} />
             <Text style={s.backBarText}>
               {breadcrumb || 'Back'}
             </Text>
@@ -722,7 +722,7 @@ export default function TeamScreen({ navigation }) {
                   <Text style={s.uplineId}>{currentRoot.id} · {currentRoot.mobile}</Text>
                 </View>
                 <TouchableOpacity style={s.callBtn} onPress={() => makeCall(currentRoot.mobile)}>
-                  <Text style={s.callBtnText}>📞</Text>
+                  <Icon name={Icons.phone} size={18} color={colors.white} />
                 </TouchableOpacity>
               </View>
               <Text style={s.downlineCount}>
@@ -773,7 +773,7 @@ export default function TeamScreen({ navigation }) {
 
         {/* Global Search */}
         <View style={[s.searchBox, searchFocused && s.searchBoxFocused]}>
-          <Text style={s.searchIcon}>🔍</Text>
+          <Icon name={Icons.search} size={16} color={colors.onSurfaceMuted} style={{ marginLeft: 12 }} />
           <TextInput
             style={s.searchInput}
             placeholder="Search any member by name, ID or mobile..."
@@ -785,7 +785,7 @@ export default function TeamScreen({ navigation }) {
           />
           {globalSearch.length > 0 && (
             <TouchableOpacity onPress={() => setGlobalSearch('')}>
-              <Text style={s.clearBtn}>✕</Text>
+              <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} style={{ marginRight: 8 }} />
             </TouchableOpacity>
           )}
         </View>

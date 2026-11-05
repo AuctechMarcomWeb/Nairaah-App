@@ -316,7 +316,7 @@ export default function BusinessPayoutScreen() {
 
               {payouts.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                  <Text style={{ fontSize: 40, marginBottom: 10 }}>💸</Text>
+                  <Icon name={Icons.empty} size={48} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 10 }} />
                   <Text style={{ ...typography.bodyMedium, color: colors.onSurfaceMuted }}>No payout records yet</Text>
                 </View>
               ) : (

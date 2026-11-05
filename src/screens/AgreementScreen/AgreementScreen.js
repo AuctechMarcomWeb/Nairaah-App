@@ -7,14 +7,14 @@ import {
 import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, PrimaryButton, Divider } from '../../components';
+import Icon, { Icons } from '../../components/Icon';
 import { getProfile } from '../../api/auth';
 import { getAllAgreements, getAgreementById, acceptAgreement } from '../../api/agreement';
 
-const fmtDate = (v) => v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+const fmtDate = (v) => v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
 
 export default function AgreementScreen({ navigation }) {
   const { user } = useSelector(state => state.user);
-
   const [loading,     setLoading]     = useState(true);
   const [submitting,  setSubmitting]  = useState(false);
   const [accepted,    setAccepted]    = useState(false);
@@ -24,9 +24,7 @@ export default function AgreementScreen({ navigation }) {
   const [checked,     setChecked]     = useState(false);
   const [mySignature, setMySignature] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -61,7 +59,7 @@ export default function AgreementScreen({ navigation }) {
     const res = await acceptAgreement(mySignature.trim());
     setSubmitting(false);
     if (res.success) {
-      Alert.alert('Agreement Accepted ✅', 'Aapka agreement successfully sign ho gaya!');
+      Alert.alert('Agreement Accepted', 'Aapka agreement successfully sign ho gaya!');
       loadData();
     } else {
       Alert.alert('Error', res.message || 'Agreement accept karne mein error aaya');
@@ -79,9 +77,7 @@ export default function AgreementScreen({ navigation }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={s.container}>
         <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
         <AppHeader title="Agreement" onBack={() => navigation.goBack()} />
@@ -91,7 +87,7 @@ export default function AgreementScreen({ navigation }) {
           {/* Status Banner */}
           {accepted ? (
             <View style={s.acceptedBanner}>
-              <Text style={s.acceptedIcon}>✅</Text>
+              <Icon name={Icons.success} size={26} color={colors.success} />
               <View style={{ flex: 1 }}>
                 <Text style={s.acceptedTitle}>Agreement Accepted</Text>
                 {acceptedAt && <Text style={s.acceptedDate}>Accepted on: {fmtDate(acceptedAt)}</Text>}
@@ -100,7 +96,7 @@ export default function AgreementScreen({ navigation }) {
             </View>
           ) : (
             <View style={s.pendingBanner}>
-              <Text style={s.pendingIcon}>⏳</Text>
+              <Icon name={Icons.pending} size={26} color={colors.warning} />
               <View style={{ flex: 1 }}>
                 <Text style={s.pendingTitle}>Agreement Pending</Text>
                 <Text style={s.pendingSub}>Neeche agreement padh ke sign karo</Text>
@@ -127,29 +123,26 @@ export default function AgreementScreen({ navigation }) {
             </View>
           )}
 
-          {/* Sign Section — only if not accepted yet */}
+          {/* Sign Section */}
           {!accepted && agreement && (
             <View style={s.card}>
               <Text style={s.signTitle}>Declaration & Signature</Text>
               <Divider style={{ marginVertical: 10 }} />
 
-              {/* Checkbox */}
               <TouchableOpacity style={s.checkRow} onPress={() => setChecked(p => !p)} activeOpacity={0.8}>
                 <View style={[s.checkbox, checked && s.checkboxActive]}>
-                  {checked && <Text style={{ color: colors.white, fontSize: 12, fontWeight: '900' }}>✓</Text>}
+                  {checked && <Icon name={Icons.check} size={13} color={colors.white} />}
                 </View>
                 <Text style={s.checkLabel}>
                   Main ye ghoshna karta/karti hoon ki maine upar diya hua agreement poora padh liya hai aur main iske saare terms aur conditions se sehmat hoon.
                 </Text>
               </TouchableOpacity>
 
-              {/* Signature input */}
               <View style={s.sigBox}>
                 <Text style={s.sigLabel}>Naam as Signature *</Text>
                 <TextInput
                   style={s.sigInput}
-                  value={mySignature}
-                  onChangeText={setMySignature}
+                  value={mySignature} onChangeText={setMySignature}
                   placeholder="Apna poora naam likhein"
                   placeholderTextColor={colors.onSurfaceMuted}
                 />
@@ -175,28 +168,21 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll:    { padding: spacing.lg },
   card:      { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: 12, ...elevation.level1 },
-
   acceptedBanner: { backgroundColor: colors.successContainer, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12, borderWidth: 1, borderColor: '#A7F3D0' },
-  acceptedIcon:   { fontSize: 28 },
   acceptedTitle:  { ...typography.titleMedium, color: colors.success },
   acceptedDate:   { ...typography.bodySmall, color: colors.success, marginTop: 2 },
   acceptedSig:    { ...typography.bodySmall, color: colors.success, marginTop: 2, fontStyle: 'italic' },
-
-  pendingBanner: { backgroundColor: colors.warningContainer, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12, borderWidth: 1, borderColor: '#FDE68A' },
-  pendingIcon:   { fontSize: 28 },
-  pendingTitle:  { ...typography.titleMedium, color: colors.warning },
-  pendingSub:    { ...typography.bodySmall, color: colors.warning, marginTop: 2 },
-
+  pendingBanner:  { backgroundColor: colors.warningContainer, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12, borderWidth: 1, borderColor: '#FDE68A' },
+  pendingTitle:   { ...typography.titleMedium, color: colors.warning },
+  pendingSub:     { ...typography.bodySmall, color: colors.warning, marginTop: 2 },
   agreementTitle:   { ...typography.titleLarge, color: colors.onSurface },
   agreementContent: { ...typography.bodyMedium, color: colors.onSurface, lineHeight: 24 },
-
-  signTitle: { ...typography.titleMedium, color: colors.onSurface },
-  checkRow:  { flexDirection: 'row', gap: 12, marginBottom: spacing.lg },
-  checkbox:  { width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: colors.outline, alignItems: 'center', justifyContent: 'center', marginTop: 2, flexShrink: 0 },
+  signTitle:  { ...typography.titleMedium, color: colors.onSurface },
+  checkRow:   { flexDirection: 'row', gap: 12, marginBottom: spacing.lg },
+  checkbox:   { width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: colors.outline, alignItems: 'center', justifyContent: 'center', marginTop: 2, flexShrink: 0 },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkLabel:{ ...typography.bodyMedium, color: colors.onSurface, flex: 1, lineHeight: 22 },
-
-  sigBox:   { marginBottom: spacing.lg },
-  sigLabel: { ...typography.labelLarge, color: colors.onSurfaceVariant, marginBottom: 6 },
-  sigInput: { borderWidth: 1.5, borderColor: colors.outline, borderRadius: radius.md, height: 50, paddingHorizontal: spacing.md, ...typography.bodyLarge, color: colors.onSurface, backgroundColor: colors.background },
+  checkLabel: { ...typography.bodyMedium, color: colors.onSurface, flex: 1, lineHeight: 22 },
+  sigBox:     { marginBottom: spacing.lg },
+  sigLabel:   { ...typography.labelLarge, color: colors.onSurfaceVariant, marginBottom: 6 },
+  sigInput:   { borderWidth: 1.5, borderColor: colors.outline, borderRadius: radius.md, height: 50, paddingHorizontal: spacing.md, ...typography.bodyLarge, color: colors.onSurface, backgroundColor: colors.background },
 });

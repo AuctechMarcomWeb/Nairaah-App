@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, PrimaryButton } from '../../components';
+import Icon, { Icons } from '../../components/Icon';
 import { updatePassword } from '../../api/users';
 
 function Field({ label, value, onChangeText, placeholder }) {
@@ -25,7 +26,7 @@ function Field({ label, value, onChangeText, placeholder }) {
           onBlur={() => setFocused(false)}
         />
         <TouchableOpacity onPress={() => setShow(p => !p)} style={f.eyeBtn}>
-          <Text style={f.eyeIcon}>{show ? '🙈' : '👁️'}</Text>
+          <Icon name={show ? Icons.eyeOff : Icons.eye} size={18} color={colors.onSurfaceMuted} />
         </TouchableOpacity>
       </View>
     </View>
@@ -61,7 +62,7 @@ export default function ChangePasswordScreen({ navigation }) {
     const res = await updatePassword(oldPwd, newPwd);
     setLoading(false);
     if (res.success) {
-      Alert.alert('Success ✅', 'Password successfully change ho gaya!', [
+      Alert.alert('Password Changed', 'Password successfully change ho gaya!', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } else {
@@ -80,7 +81,7 @@ export default function ChangePasswordScreen({ navigation }) {
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.card}>
             <View style={s.iconRow}>
-              <Text style={s.icon}>🔒</Text>
+              <Icon name={Icons.lock} size={48} color={colors.primary} />
             </View>
             <Text style={s.subtitle}>Apna secure password set karo</Text>
 

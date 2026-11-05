@@ -6,6 +6,7 @@ import {
 import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider } from '../../components';
+import Icon, { Icons } from '../../components/Icon';
 import { getMyPayouts } from '../../api/payout';
 
 function PayoutCard({ item, onPress }) {
@@ -13,7 +14,7 @@ function PayoutCard({ item, onPress }) {
     <TouchableOpacity style={pc.card} onPress={onPress} activeOpacity={0.8}>
       <View style={pc.header}>
         <View style={pc.cycleBox}>
-          <Text style={pc.cycleIcon}>📅</Text>
+          <Icon name={Icons.calendar} size={22} color={colors.primary} />
           <View>
             <Text style={pc.cycleTitle}>Payout Cycle</Text>
             <Text style={pc.cycleDates}>{item.cycleStart} – {item.cycleEnd}</Text>
@@ -60,7 +61,6 @@ const pc = StyleSheet.create({
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cycleBox: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cycleIcon: { fontSize: 22 },
   cycleTitle: { ...typography.labelMedium, color: colors.onSurfaceMuted },
   cycleDates: { ...typography.titleSmall, color: colors.onSurface, marginTop: 2 },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
@@ -264,7 +264,7 @@ export default function PayoutScreen() {
 
           {payouts.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <Text style={{ fontSize: 40, marginBottom: 10 }}>💸</Text>
+              <Icon name={Icons.empty} size={48} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 10 }} />
               <Text style={{ ...typography.bodyMedium, color: colors.onSurfaceMuted }}>No payout records yet</Text>
             </View>
           ) : (

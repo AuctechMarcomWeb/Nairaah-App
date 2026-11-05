@@ -8,7 +8,7 @@ const productApi = createAxiosInstance('product');
  */
 export const getAllProducts = async () => {
   try {
-    const response = await productApi.get('/');
+    const response = await productApi.get('/?isActive=true');
     if (response.data.success) {
       return { success: true, data: response.data.data };
     }

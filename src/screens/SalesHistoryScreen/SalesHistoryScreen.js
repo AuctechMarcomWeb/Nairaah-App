@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import Icon, { Icons } from '../../components/Icon';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   StatusBar, Modal, FlatList, ActivityIndicator,
@@ -6,6 +8,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
+import Icon, { Icons } from '../../components/Icon';
 import { AppHeader, StatusChip, Divider, SearchBar } from '../../components';
 import {
   getMyOrders, cancelOrder, getOrderById, getOrderLogs,
@@ -13,9 +16,9 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TABS = [
-  { key: 'myReferral', label: 'Referral',  icon: '⭐' },
-  { key: 'myCreated',  label: 'Created',   icon: '📋' },
-  { key: 'myOrders',   label: 'My Orders', icon: '🛒' },
+  { key: 'myReferral', label: 'Referral',  iconName: Icons.star     },
+  { key: 'myCreated',  label: 'Created',   iconName: Icons.created  },
+  { key: 'myOrders',   label: 'My Orders', iconName: Icons.myOrders },
 ];
 
 const ORDER_STATUSES = ['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'PartialCancel', 'Approved'];
@@ -193,7 +196,7 @@ function OrderDetailModal({ visible, order, onClose, onCancel, onRefresh }) {
               <Text style={dm.orderDate}>{fmtDate(o?.orderDate || o?.createdAt)}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={dm.closeBtn}>
-              <Text style={dm.closeTxt}>✕</Text>
+              <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} />
             </TouchableOpacity>
           </View>
 
@@ -211,11 +214,12 @@ function OrderDetailModal({ visible, order, onClose, onCancel, onRefresh }) {
 
           {/* Tabs */}
           <View style={dm.tabRow}>
-            {[['detail', '📄 Detail'], ['logs', '📜 Logs']].map(([key, lbl]) => (
+            {[['detail', Icons.agreement, 'Detail'], ['logs', Icons.logs, 'Logs']].map(([key, iconName, lbl]) => (
               <TouchableOpacity
                 key={key}
                 style={[dm.tabBtn, tab === key && dm.tabBtnActive]}
                 onPress={() => key === 'logs' ? loadLogs() : setTab('detail')}>
+                <Icon name={iconName} size={14} color={tab === key ? colors.primary : colors.onSurfaceMuted} />
                 <Text style={[dm.tabTxt, tab === key && dm.tabTxtActive]}>{lbl}</Text>
               </TouchableOpacity>
             ))}
@@ -346,7 +350,12 @@ function OrderDetailModal({ visible, order, onClose, onCancel, onRefresh }) {
               disabled={cancelling}>
               {cancelling
                 ? <ActivityIndicator color={colors.white} size="small" />
-                : <Text style={dm.cancelTxt}>✕  Cancel Order</Text>}
+                : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Icon name={Icons.cancel} size={18} color={colors.white} />
+                    <Text style={dm.cancelTxt}>Cancel Order</Text>
+                  </View>
+                )}
             </TouchableOpacity>
           )}
         </View>
@@ -399,10 +408,11 @@ function OrderRow({ item, onPress }) {
     <TouchableOpacity style={row.wrap} onPress={onPress} activeOpacity={0.75}>
       <View style={row.left}>
         <View style={[row.typeBadge, { backgroundColor: item.buyerType === 'Distributor' ? '#EDE9FE' : '#DBEAFE' }]}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: item.buyerType === 'Distributor' ? '#7C3AED' : '#1A73E8' }}>
-            {item.buyerType === 'Distributor' ? '🤝 Dist' : '👤 Cust'}
-          </Text>
-        </View>
+        <Icon name={item.buyerType === 'Distributor' ? Icons.distributor : Icons.customer} size={12} color={item.buyerType === 'Distributor' ? '#7C3AED' : '#1A73E8'} />
+        <Text style={{ fontSize: 10, fontWeight: '700', color: item.buyerType === 'Distributor' ? '#7C3AED' : '#1A73E8', marginLeft: 3 }}>
+          {item.buyerType === 'Distributor' ? 'Dist' : 'Cust'}
+        </Text>
+      </View>
         <Text style={row.buyerName} numberOfLines={1}>{item.buyerName}</Text>
         <Text style={row.meta}>{item.orderNumber || item.billNo || '—'}  ·  {fmtDate(item.orderDate || item.createdAt)}</Text>
       </View>
@@ -486,12 +496,19 @@ export default function SalesHistoryScreen({ navigation }) {
     setLoadingMore(false);
   }, [activeTab, search, filters]);
 
-  // initial + on filter/search change
+  // initial + on filter/search change — also re-fetch when screen gets focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders(activeTab, 1, false);
+    }, [activeTab, filters])
+  );
+
+  // Search — debounced separately
   useEffect(() => {
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => fetchOrders(activeTab, 1, false), search ? 400 : 0);
+    searchTimer.current = setTimeout(() => fetchOrders(activeTab, 1, false), 400);
     return () => clearTimeout(searchTimer.current);
-  }, [activeTab, search, filters]);
+  }, [search]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -515,6 +532,7 @@ export default function SalesHistoryScreen({ navigation }) {
   const totalAmt     = orders.reduce((a, o) => a + o.totalAmount,   0);
   const paidCount    = orders.filter(o => o.paymentStatus === 'Paid').length;
   const pendingCount = orders.filter(o => o.paymentStatus === 'Pending').length;
+  const partialCount = orders.filter(o => o.paymentStatus === 'Partial').length;
 
   // Active filter count (for badge)
   const activeFilterCount = Object.values(filters).filter(v => v !== 'All').length + (search.trim() ? 1 : 0);
@@ -536,8 +554,9 @@ export default function SalesHistoryScreen({ navigation }) {
             key={t.key}
             style={[s.tab, activeTab === t.key && s.tabActive]}
             onPress={() => handleTabChange(t.key)}>
+            <Icon name={t.iconName} size={14} color={activeTab === t.key ? colors.primary : colors.onSurfaceMuted} />
             <Text style={[s.tabTxt, activeTab === t.key && s.tabTxtActive]}>
-              {t.icon} {t.label}
+              {t.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -547,10 +566,11 @@ export default function SalesHistoryScreen({ navigation }) {
         {/* Stats */}
         <View style={s.statsRow}>
           {[
-            { val: total,        label: 'Total',   color: colors.primary   },
-            { val: fmtMoney(totalAmt), label: 'Amount', color: colors.onSurface },
-            { val: paidCount,    label: 'Paid',    color: colors.success   },
-            { val: pendingCount, label: 'Pending', color: colors.pending   },
+            { val: total,              label: 'Total',   color: colors.primary   },
+            { val: fmtMoney(totalAmt), label: 'Amount',  color: colors.onSurface },
+            { val: paidCount,          label: 'Paid',    color: colors.success   },
+            { val: partialCount,       label: 'Partial', color: colors.warning   },
+            { val: pendingCount,       label: 'Pending', color: colors.pending   },
           ].map((st, i) => (
             <React.Fragment key={st.label}>
               {i > 0 && <View style={s.statDiv} />}
@@ -596,7 +616,7 @@ export default function SalesHistoryScreen({ navigation }) {
             ListFooterComponent={loadingMore ? <ActivityIndicator style={{ padding: 16 }} color={colors.primary} /> : <View style={{ height: 24 }} />}
             ListEmptyComponent={
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>🧾</Text>
+                <Icon name={Icons.empty} size={48} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 8 }} />
                 <Text style={s.emptyTxt}>No orders found</Text>
               </View>
             }
@@ -627,7 +647,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
   tabBar:    { flexDirection: 'row', backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  tab:       { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  tab:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },
   tabActive: { borderBottomWidth: 2, borderBottomColor: colors.primary },
   tabTxt:    { ...typography.labelMedium, color: colors.onSurfaceMuted },
   tabTxtActive: { color: colors.primary, fontWeight: '700' },
@@ -646,6 +666,5 @@ const s = StyleSheet.create({
   filterTxt: { ...typography.labelMedium, color: colors.onSurfaceMuted },
 
   empty:     { alignItems: 'center', paddingVertical: 48 },
-  emptyIcon: { fontSize: 44, marginBottom: 8 },
   emptyTxt:  { ...typography.bodyMedium, color: colors.onSurfaceMuted },
 });

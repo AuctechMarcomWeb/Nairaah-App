@@ -29,9 +29,9 @@ const NAV_ITEMS = [
 ];
 
 const QUICK_ITEMS = [
-  { label: 'Add Member',        icon: 'account-plus-outline',       screen: 'AddMember'      },
+  { label: 'New Order',         icon: 'cart-plus',                  screen: 'CreateSale'     },
+  { label: 'Add Distributor/Customer', icon: 'account-plus-outline', screen: 'AddMember'    },
   { label: 'Customers',         icon: 'account-multiple-outline',   screen: 'Customers'      },
-  { label: 'Create Sale',       icon: 'cart-plus',                  screen: 'CreateSale'     },
   { label: 'Products',          icon: 'package-variant-outline',    screen: 'Products'       },
   { label: 'Commission',        icon: 'cash-multiple',              screen: 'Commission'     },
   { label: 'Change Password',   icon: 'lock-reset',                 screen: 'ChangePassword' },
@@ -157,21 +157,21 @@ export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashbo
           </View>
         </View>
 
-        {/* Stats row */}
+        {/* Stats row — placeholder, replaced with real data from dashboard */}
         <View style={s.statsRow}>
           <View style={s.statItem}>
-            <Text style={s.statVal}>₹4.85L</Text>
-            <Text style={s.statLab}>Total Sales</Text>
+            <Icon name="briefcase-outline" size={20} color="rgba(255,255,255,0.7)" />
+            <Text style={s.statLab}>Business</Text>
           </View>
           <View style={s.statDivider} />
           <View style={s.statItem}>
-            <Text style={s.statVal}>₹86.4K</Text>
+            <Icon name="cash-multiple" size={20} color="rgba(255,255,255,0.7)" />
             <Text style={s.statLab}>Commission</Text>
           </View>
           <View style={s.statDivider} />
           <View style={s.statItem}>
-            <Text style={s.statVal}>Gold</Text>
-            <Text style={s.statLab}>Rank</Text>
+            <Icon name="medal-outline" size={20} color="rgba(255,255,255,0.7)" />
+            <Text style={s.statLab}>{displayLevel || 'My Level'}</Text>
           </View>
         </View>
       </View>
