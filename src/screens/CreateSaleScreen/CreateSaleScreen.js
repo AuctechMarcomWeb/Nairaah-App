@@ -13,8 +13,7 @@ import { AppHeader, PrimaryButton, Divider, PickerModal } from '../../components
 import Icon, { Icons } from '../../components/Icon';
 import { getAllProducts } from '../../api/products';
 import { getMySponsoredUsers } from '../../api/team';
-import { placeOrderForOthers } from '../../api/orders';
-import { createUser } from '../../api/users';
+import { placeOrder } from '../../api/orders';
 
 const PAYMENT_METHODS = ['COD', 'Online', 'UPI', 'Wallet'];
 const fmtMoney = (v) => `\u20B9${(Number(v) || 0).toLocaleString('en-IN')}`;
@@ -79,7 +78,7 @@ const fl = StyleSheet.create({
 });
 
 // ─── Success Modal ────────────────────────────────────────────────────────────
-function SuccessModal({ visible, order, onClose }) {
+function SuccessModal({ visible, order, onNewOrder, onBack }) {
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={sm.overlay}>
@@ -90,10 +89,14 @@ function SuccessModal({ visible, order, onClose }) {
             <>
               <Text style={sm.sub}>{order.orderNumber || 'Order created successfully'}</Text>
               <Text style={sm.amt}>{fmtMoney(order.totalAmount)}</Text>
+              <Text style={sm.note}>Commission calculated. Track this order in My Orders.</Text>
             </>
           )}
-          <TouchableOpacity style={sm.btn} onPress={onClose}>
-            <Text style={sm.btnTxt}>Done</Text>
+          <TouchableOpacity style={sm.btn} onPress={onNewOrder}>
+            <Text style={sm.btnTxt}>New Order</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={sm.backBtn} onPress={onBack}>
+            <Text style={sm.backTxt}>Back to Orders</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -102,12 +105,15 @@ function SuccessModal({ visible, order, onClose }) {
 }
 const sm = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  card:    { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 32, alignItems: 'center', width: '80%', ...elevation.level3 },
+  card:    { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 32, alignItems: 'center', width: '82%', ...elevation.level3 },
   title:   { ...typography.headlineSmall, color: colors.onSurface, marginBottom: 6 },
   sub:     { ...typography.bodyMedium, color: colors.onSurfaceMuted, marginBottom: 4 },
-  amt:     { ...typography.headlineMedium, color: colors.primary, fontWeight: '800', marginBottom: 20 },
-  btn:     { backgroundColor: colors.primary, borderRadius: radius.lg, paddingHorizontal: 40, paddingVertical: 13 },
+  amt:     { ...typography.headlineMedium, color: colors.primary, fontWeight: '800', marginBottom: 8 },
+  note:    { ...typography.bodySmall, color: colors.onSurfaceMuted, textAlign: 'center', marginBottom: 20 },
+  btn:     { backgroundColor: colors.primary, borderRadius: radius.lg, paddingHorizontal: 40, paddingVertical: 13, width: '100%', alignItems: 'center', marginBottom: 10 },
   btnTxt:  { ...typography.titleMedium, color: colors.white },
+  backBtn: { borderWidth: 1.5, borderColor: colors.outline, borderRadius: radius.lg, paddingHorizontal: 40, paddingVertical: 11, width: '100%', alignItems: 'center' },
+  backTxt: { ...typography.titleMedium, color: colors.onSurfaceMuted },
 });
 
 // ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
@@ -193,20 +199,41 @@ export default function CreateSaleScreen({ navigation, route }) {
   const handleSameAsAbove = (checked) => {
     setSameAsAbove(checked);
     if (checked) {
-      if (buyerMode === 'existing' && selectedBuyer) {
-        setShipName(selectedBuyer.name || ''); setShipPhone(selectedBuyer.mobile || '');
-        setShipPincode(''); setShipCity(''); setShipState(''); setShipAddress('');
-      } else if (buyerMode === 'new') {
-        setShipName(newName); setShipPhone(newPhone); setShipPincode(newPincode);
-        setShipCity(newCity); setShipState(newState); setShipAddress(newAddress);
-      }
+      syncShippingFromBuyer();
     } else {
       setShipName(''); setShipPhone(''); setShipPincode('');
       setShipCity(''); setShipState(''); setShipAddress('');
     }
   };
 
-  const unitPrice = (p) => buyerType === 'Distributor' ? p.distributorPrice : p.sellingPrice;
+  // Sync shipping fields from current buyer (called on check + whenever buyer changes while checked)
+  const syncShippingFromBuyer = () => {
+    if (buyerMode === 'existing' && selectedBuyer) {
+      setShipName(selectedBuyer.name || '');
+      setShipPhone(selectedBuyer.mobile || selectedBuyer.phone || '');
+      setShipPincode(selectedBuyer.pincode || '');
+      setShipCity(selectedBuyer.city || '');
+      setShipState(selectedBuyer.state || '');
+      setShipAddress(selectedBuyer.address || '');
+    } else if (buyerMode === 'new') {
+      setShipName(newName);
+      setShipPhone(newPhone);
+      setShipPincode(newPincode);
+      setShipCity(newCity);
+      setShipState(newState);
+      setShipAddress(newAddress);
+    }
+  };
+
+  // Auto-update shipping when buyer changes and sameAsAbove is checked
+  useEffect(() => {
+    if (sameAsAbove) syncShippingFromBuyer();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBuyer, buyerMode, newName, newPhone, newPincode, newCity, newState, newAddress, sameAsAbove]);
+
+  const unitPrice = (p) => buyerType === 'Distributor'
+    ? (p.distributorPrice ?? p.sellingPrice ?? p.mrp ?? 0)
+    : (p.sellingPrice ?? p.mrp ?? 0);
 
   const addProduct = (product) => {
     const existing = cartItems.find(i => i.product.id === product.id);
@@ -232,18 +259,27 @@ export default function CreateSaleScreen({ navigation, route }) {
   const payStatus = derivePaymentStatus(paid, total);
 
   useEffect(() => {
-    setPaidAmount(paymentMethod === 'COD' ? '0' : String(total));
+    // Match Admin: default paidAmount = total for all methods; user can reduce for partial
+    setPaidAmount(String(total));
   }, [total, paymentMethod]);
 
   const handleSubmit = async () => {
-    if (cartItems.length === 0) { Alert.alert('Required', 'Kam se kam ek product add karo.'); return; }
-    if (buyerMode === 'existing' && !selectedBuyer) { Alert.alert('Required', `Existing ${buyerType} select karo.`); return; }
+    if (cartItems.length === 0) { Alert.alert('Required', 'Please add at least one product.'); return; }
+
+    // Price validation — match Admin
+    const noPriceItem = cartItems.find(i => unitPrice(i.product) <= 0);
+    if (noPriceItem) {
+      Alert.alert('Price Not Set', `Price not set for "${noPriceItem.product.name}". Please contact admin.`);
+      return;
+    }
+
+    if (buyerMode === 'existing' && !selectedBuyer) { Alert.alert('Required', `Please select an existing ${buyerType}.`); return; }
     if (buyerMode === 'new') {
-      if (!newName.trim()) { Alert.alert('Required', 'Buyer ka naam daalo.'); return; }
-      if (!newPhone.trim() || newPhone.trim().length !== 10) { Alert.alert('Invalid', 'Valid 10-digit mobile number daalo.'); return; }
+      if (!newName.trim()) { Alert.alert('Required', 'Please enter buyer name.'); return; }
+      if (!newPhone.trim() || newPhone.trim().length !== 10) { Alert.alert('Invalid', 'Please enter a valid 10-digit mobile number.'); return; }
     }
     if ((paymentMethod === 'Online' || paymentMethod === 'UPI') && !transactionId.trim()) {
-      Alert.alert('Required', 'Transaction ID daalo.'); return;
+      Alert.alert('Required', 'Please enter Transaction ID.'); return;
     }
     setLoading(true);
     try {
@@ -263,31 +299,37 @@ export default function CreateSaleScreen({ navigation, route }) {
         totalPrice: unitPrice(i.product) * i.qty,
       }));
 
+      const isOnline = paymentMethod === 'Online' || paymentMethod === 'UPI';
       const payload = {
-        ...(buyerId      ? { buyer: buyerId }   : {}),
-        ...(buyerDetails ? { buyerDetails }     : {}),
+        ...(buyerId ? { buyer: buyerId } : { buyer: '' }),
+        ...(buyerDetails ? { buyerDetails } : {}),
         buyerType, orderDate,
         items: itemsPayload, subtotal, discount: 0, totalAmount: total,
-        paidAmount: paid, paymentStatus: payStatus,
+        paidAmount: paid, refundAmount: 0,
+        // Match Admin: Online always Paid; else derive from paid amount
+        paymentStatus: isOnline ? 'Paid' : (paid >= total ? 'Paid' : paid > 0 ? 'Partial' : 'Pending'),
         paymentMethod: (paymentMethod === 'UPI' || paymentMethod === 'Wallet') ? 'Online' : paymentMethod,
         ...(transactionId.trim() ? { transactionId: transactionId.trim(), paymentId: transactionId.trim() } : {}),
         notes: notes.trim() || '',
         shippingAddress: {
-          name:    shipName.trim()    || (buyerMode === 'existing' ? selectedBuyer?.name   : newName)  || '',
-          phone:   shipPhone.trim()   || (buyerMode === 'existing' ? selectedBuyer?.mobile : newPhone) || '',
-          address: shipAddress.trim() || '', city: shipCity.trim() || '',
-          state:   shipState.trim()   || '', pincode: shipPincode.trim() || '', country: 'India',
+          name:    shipName.trim()    || (buyerMode === 'existing' ? selectedBuyer?.name    : newName)    || '',
+          phone:   shipPhone.trim()   || (buyerMode === 'existing' ? selectedBuyer?.mobile || selectedBuyer?.phone : newPhone) || '',
+          address: shipAddress.trim() || (buyerMode === 'existing' ? selectedBuyer?.address : newAddress) || '',
+          city:    shipCity.trim()    || (buyerMode === 'existing' ? selectedBuyer?.city    : newCity)    || '',
+          state:   shipState.trim()   || (buyerMode === 'existing' ? selectedBuyer?.state   : newState)   || '',
+          pincode: shipPincode.trim() || (buyerMode === 'existing' ? selectedBuyer?.pincode : newPincode) || '',
+          country: 'India',
         },
       };
 
-      const res = await placeOrderForOthers(payload);
+      const res = await placeOrder(payload);
       if (res.success) {
         setSuccessModal({ open: true, order: res.data });
       } else {
-        Alert.alert('Error', res.message || 'Order place nahi hua');
+        Alert.alert('Error', res.message || 'Failed to place order.');
       }
     } catch (e) {
-      Alert.alert('Error', 'Kuch galat hua. Dobara try karo.');
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -448,7 +490,32 @@ export default function CreateSaleScreen({ navigation, route }) {
               </View>
               <Text style={s.checkLabel}>Same as above details</Text>
             </TouchableOpacity>
-            {!sameAsAbove && (
+
+            {/* When sameAsAbove — show read-only preview of what will be sent */}
+            {sameAsAbove ? (
+              <View style={s.samePreview}>
+                {[
+                  ['Name',    shipName],
+                  ['Phone',   shipPhone],
+                  ['Address', shipAddress],
+                  ['City',    shipCity],
+                  ['State',   shipState],
+                  ['Pincode', shipPincode],
+                ].map(([lbl, val]) => val ? (
+                  <View key={lbl} style={s.previewRow}>
+                    <Text style={s.previewLbl}>{lbl}</Text>
+                    <Text style={s.previewVal}>{val}</Text>
+                  </View>
+                ) : null)}
+                {(!shipName && !shipPhone && !shipAddress) && (
+                  <Text style={s.previewEmpty}>
+                    {buyerMode === 'existing' && !selectedBuyer
+                      ? 'Please select a buyer first.'
+                      : 'Buyer address not available — please fill manually.'}
+                  </Text>
+                )}
+              </View>
+            ) : (
               <>
                 <View style={s.twoCol}>
                   <View style={{ flex: 1 }}><Field label="Name"  value={shipName}  onChangeText={setShipName}  placeholder="Recipient name" /></View>
@@ -497,7 +564,9 @@ export default function CreateSaleScreen({ navigation, route }) {
                     <View style={s.tableRow}>
                       <View style={{ flex: 3 }}>
                         <Text style={s.tdName} numberOfLines={2}>{item.product.name}</Text>
-                        <Text style={s.tdPrice}>{fmtMoney(unitPrice(item.product))}</Text>
+                        <Text style={[s.tdPrice, unitPrice(item.product) <= 0 && { color: colors.error }]}>
+                          {unitPrice(item.product) > 0 ? fmtMoney(unitPrice(item.product)) : '⚠ Price not set'}
+                        </Text>
                       </View>
                       <View style={[s.qtyControl, { flex: 1 }]}>
                         <TouchableOpacity style={s.qtyBtn} onPress={() => updateQty(item.product.id, -1)}>
@@ -582,7 +651,7 @@ export default function CreateSaleScreen({ navigation, route }) {
             label="Place Order"
             onPress={handleSubmit}
             loading={loading}
-            disabled={cartItems.length === 0}
+            disabled={cartItems.length === 0 || cartItems.some(i => unitPrice(i.product) <= 0)}
             style={{ marginTop: 4 }}
           />
           <View style={{ height: 40 }} />
@@ -636,7 +705,8 @@ export default function CreateSaleScreen({ navigation, route }) {
         <SuccessModal
           visible={successModal.open}
           order={successModal.order}
-          onClose={() => { setSuccessModal({ open: false, order: null }); resetForm(); navigation.goBack(); }}
+          onNewOrder={() => { setSuccessModal({ open: false, order: null }); resetForm(); }}
+          onBack={() => { setSuccessModal({ open: false, order: null }); resetForm(); navigation.goBack(); }}
         />
       </View>
     </KeyboardAvoidingView>
@@ -684,6 +754,11 @@ const s = StyleSheet.create({
   checkbox:    { width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: colors.outline, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   checkLabel:  { ...typography.titleSmall, color: colors.onSurface, fontWeight: '700' },
+  samePreview: { backgroundColor: colors.primaryContainer, borderRadius: radius.md, padding: spacing.md, gap: 4 },
+  previewRow:  { flexDirection: 'row', gap: 6 },
+  previewLbl:  { ...typography.labelMedium, color: colors.primary, width: 60 },
+  previewVal:  { ...typography.bodyMedium, color: colors.onSurface, flex: 1 },
+  previewEmpty:{ ...typography.bodySmall, color: colors.warning, fontStyle: 'italic' },
   prodHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   addProdBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryContainer, borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 6 },
   addProdTxt:  { ...typography.labelLarge, color: colors.primary },

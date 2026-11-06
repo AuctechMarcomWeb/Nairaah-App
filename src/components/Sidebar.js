@@ -23,20 +23,20 @@ const NAV_ITEMS = [
   { label: 'Dashboard',         icon: 'view-dashboard-outline',     screen: 'Dashboard'      },
   { label: 'Orders',            icon: 'receipt-outline',            screen: 'SalesHistory'   },
   { label: 'Team / Downline',   icon: 'account-group-outline',      screen: 'Team'           },
+  { label: 'Earnings',          icon: 'cash-multiple',              screen: 'Commission'     },
   { label: 'Business & Payout', icon: 'briefcase-outline',          screen: 'BusinessPayout' },
   { label: 'Payout History',    icon: 'wallet-outline',             screen: 'Payout'         },
   { label: 'My Profile',        icon: 'account-circle-outline',     screen: 'Profile'        },
 ];
 
 const QUICK_ITEMS = [
-  { label: 'New Order',         icon: 'cart-plus',                  screen: 'CreateSale'     },
-  { label: 'Add Distributor/Customer', icon: 'account-plus-outline', screen: 'AddMember'    },
-  { label: 'Customers',         icon: 'account-multiple-outline',   screen: 'Customers'      },
-  { label: 'Products',          icon: 'package-variant-outline',    screen: 'Products'       },
-  { label: 'Commission',        icon: 'cash-multiple',              screen: 'Commission'     },
-  { label: 'Change Password',   icon: 'lock-reset',                 screen: 'ChangePassword' },
-  { label: 'Agreement',         icon: 'file-sign',                  screen: 'Agreement'      },
-  { label: 'Refund Policy',     icon: 'file-document-outline',      screen: 'RefundPolicy'   },
+  { label: 'New Order',                icon: 'cart-plus',                  screen: 'CreateSale'     },
+  { label: 'Add Distributor/Customer', icon: 'account-plus-outline',       screen: 'AddMember'      },
+  { label: 'Customers',                icon: 'account-multiple-outline',   screen: 'Customers'      },
+  { label: 'Products',                 icon: 'package-variant-outline',    screen: 'Products'       },
+  { label: 'Change Password',          icon: 'lock-reset',                 screen: 'ChangePassword' },
+  { label: 'Agreement',                icon: 'file-sign',                  screen: 'Agreement'      },
+  { label: 'Refund Policy',            icon: 'file-document-outline',      screen: 'RefundPolicy'   },
 ];
 
 // ── Nav row ─────────────────────────────────────────────────

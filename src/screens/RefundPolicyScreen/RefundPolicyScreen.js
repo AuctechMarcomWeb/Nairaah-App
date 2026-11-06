@@ -46,7 +46,7 @@ export default function RefundPolicyScreen({ navigation }) {
             <Text style={s.title}>{title}</Text>
             <View style={s.divider} />
             <Text style={s.content}>
-              {error ? 'Refund policy load nahi ho saki. Please try again later.' : content}
+              {error ? 'Failed to load refund policy. Please try again later.' : content}
             </Text>
           </View>
           <View style={{ height: 32 }} />

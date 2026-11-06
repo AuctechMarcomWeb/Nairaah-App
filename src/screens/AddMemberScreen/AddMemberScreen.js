@@ -65,7 +65,7 @@ function CredentialsCard({ userId, password, userType }) {
         <View style={cr.col}><Text style={cr.colLabel}>User ID</Text><Text style={[cr.colVal, { color }]}>{userId}</Text></View>
         <View style={cr.col}><Text style={cr.colLabel}>Password</Text><Text style={[cr.colVal, { color }]}>{password}</Text></View>
       </View>
-      <Text style={cr.hint}>Ye credentials {userType.toLowerCase()} ko share karo.</Text>
+      <Text style={cr.hint}>Share these credentials with the {userType.toLowerCase()}.</Text>
     </View>
   );
 }
@@ -122,9 +122,9 @@ function AddUserModal({ visible, onClose, sponsorId }) {
   const handleClose = () => { resetAll(); onClose(); };
 
   const handleSubmit = async () => {
-    if (!name.trim())  { Alert.alert('Required', 'Full Name required hai.'); return; }
+    if (!name.trim())  { Alert.alert('Required', 'Full name is required.'); return; }
     if (!phone.trim() || phone.trim().length !== 10) {
-      Alert.alert('Invalid', 'Valid 10-digit mobile number daalo.'); return;
+      Alert.alert('Invalid', 'Please enter a valid 10-digit mobile number.'); return;
     }
     setLoading(true);
     const res = await createUser({
@@ -134,6 +134,7 @@ function AddUserModal({ visible, onClose, sponsorId }) {
       address: address.trim() || undefined, city: city.trim() || undefined,
       state: state.trim() || undefined, pincode: pincode.trim() || undefined,
       country: 'India',
+      ...(sponsorId && { createdBy: sponsorId }),
       ...(userType === 'Distributor' && {
         bankDetails: { accountHolderName: accHolder.trim() || undefined, bankName: bankName.trim() || undefined, accountNumber: accNumber.trim() || undefined, branchName: branch.trim() || undefined, ifscCode: ifsc.trim() || undefined, accountType: accType, upiId: upiId.trim() || undefined, upiMobileNumber: upiMobile.trim() || undefined },
         kycDetails:  { aadhaarNumber: aadhaar.trim() || undefined, panNumber: pan.trim() || undefined, gstNumber: gst.trim() || undefined, documents: [] },
@@ -148,7 +149,7 @@ function AddUserModal({ visible, onClose, sponsorId }) {
       setIfsc(''); setAccType('Saving'); setUpiId(''); setUpiMobile('');
       setAadhaar(''); setPan(''); setGst(''); setTab('personal');
     } else {
-      Alert.alert('Error', res.message || `${userType} add karne mein error`);
+      Alert.alert('Error', res.message || `Failed to add ${userType}.`);
     }
   };
 
@@ -177,7 +178,7 @@ function AddUserModal({ visible, onClose, sponsorId }) {
           {/* User Type selector */}
           {!userType ? (
             <View style={am.typeSelect}>
-              <Text style={am.typeHint}>User type select karo:</Text>
+              <Text style={am.typeHint}>Select user type:</Text>
               <View style={am.typeRow}>
                 {[
                   { t: 'Customer',    iconName: Icons.customer,    color: colors.success, bg: '#ECFDF5', desc: 'Regular buyer' },
@@ -369,7 +370,7 @@ function UserDetailModal({ visible, userId, onClose, onConvert }) {
   }, [visible, userId]);
 
   const handleConvert = () => {
-    Alert.alert('Convert to Distributor', `${detail?.name} ko Customer se Distributor mein convert karein?`, [
+    Alert.alert('Convert to Distributor', `Convert ${detail?.name} from Customer to Distributor?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Convert', style: 'destructive',
@@ -377,7 +378,7 @@ function UserDetailModal({ visible, userId, onClose, onConvert }) {
           setConverting(true);
           const res = await convertToDistributor(userId);
           setConverting(false);
-          if (res.success) { Alert.alert('Success', `${detail?.name} ab Distributor hai!`); onClose(); onConvert(); }
+          if (res.success) { Alert.alert('Success', `${detail?.name} is now a Distributor.`); onClose(); onConvert(); }
           else Alert.alert('Error', res.message || 'Failed to convert');
         },
       },
@@ -670,7 +671,7 @@ export default function AddMemberScreen({ navigation }) {
             ListEmptyComponent={
               <View style={s.empty}>
                 <Icon name={Icons.emptyUser} size={48} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 8 }} />
-                <Text style={s.emptyTxt}>Koi member nahi mila</Text>
+                <Text style={s.emptyTxt}>No members found</Text>
                 <TouchableOpacity style={s.addBtn} onPress={() => setShowAddModal(true)}>
                   <Text style={s.addBtnTxt}>Add First Member</Text>
                 </TouchableOpacity>

@@ -50,19 +50,19 @@ export default function ChangePasswordScreen({ navigation }) {
 
   const handleSubmit = async () => {
     if (!oldPwd.trim() || !newPwd.trim() || !confPwd.trim()) {
-      Alert.alert('Required', 'Saare fields fill karo.'); return;
+      Alert.alert('Required', 'Please fill all fields.'); return;
     }
     if (newPwd.length < 6) {
-      Alert.alert('Invalid', 'New password kam se kam 6 characters ka hona chahiye.'); return;
+      Alert.alert('Invalid', 'New password must be at least 6 characters.'); return;
     }
     if (newPwd !== confPwd) {
-      Alert.alert('Mismatch', 'New password aur Confirm password match nahi kar rahe.'); return;
+      Alert.alert('Mismatch', 'New password and Confirm password do not match.'); return;
     }
     setLoading(true);
     const res = await updatePassword(oldPwd, newPwd);
     setLoading(false);
     if (res.success) {
-      Alert.alert('Password Changed', 'Password successfully change ho gaya!', [
+      Alert.alert('Password Changed', 'Your password has been changed successfully.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } else {
@@ -83,7 +83,7 @@ export default function ChangePasswordScreen({ navigation }) {
             <View style={s.iconRow}>
               <Icon name={Icons.lock} size={48} color={colors.primary} />
             </View>
-            <Text style={s.subtitle}>Apna secure password set karo</Text>
+            <Text style={s.subtitle}>Set a strong and secure password</Text>
 
             <Field label="Current Password"  value={oldPwd}  onChangeText={setOldPwd}  placeholder="Enter current password" />
             <Field label="New Password"       value={newPwd}  onChangeText={setNewPwd}  placeholder="Min. 6 characters" />

@@ -53,16 +53,16 @@ export default function AgreementScreen({ navigation }) {
   };
 
   const handleAccept = async () => {
-    if (!checked) { Alert.alert('Required', 'Pehle declaration checkbox select karo.'); return; }
-    if (!mySignature.trim()) { Alert.alert('Required', 'Apna naam signature ke roop mein daalo.'); return; }
+    if (!checked) { Alert.alert('Required', 'Please select the declaration checkbox first.'); return; }
+    if (!mySignature.trim()) { Alert.alert('Required', 'Please enter your name as signature.'); return; }
     setSubmitting(true);
     const res = await acceptAgreement(mySignature.trim());
     setSubmitting(false);
     if (res.success) {
-      Alert.alert('Agreement Accepted', 'Aapka agreement successfully sign ho gaya!');
+      Alert.alert('Agreement Accepted', 'Your agreement has been successfully signed!');
       loadData();
     } else {
-      Alert.alert('Error', res.message || 'Agreement accept karne mein error aaya');
+      Alert.alert('Error', res.message || 'Failed to accept agreement.');
     }
   };
 
@@ -99,7 +99,7 @@ export default function AgreementScreen({ navigation }) {
               <Icon name={Icons.pending} size={26} color={colors.warning} />
               <View style={{ flex: 1 }}>
                 <Text style={s.pendingTitle}>Agreement Pending</Text>
-                <Text style={s.pendingSub}>Neeche agreement padh ke sign karo</Text>
+                <Text style={s.pendingSub}>Please read the agreement below and sign it</Text>
               </View>
             </View>
           )}
@@ -112,13 +112,13 @@ export default function AgreementScreen({ navigation }) {
               <Text style={s.agreementContent}>
                 {agreement.content
                   ? agreement.content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
-                  : 'Agreement content load nahi ho saka.'}
+                  : 'Failed to load agreement content.'}
               </Text>
             </View>
           ) : (
             <View style={s.card}>
               <Text style={{ ...typography.bodyMedium, color: colors.onSurfaceMuted, textAlign: 'center' }}>
-                Koi active agreement nahi mili.
+                No active agreement found.
               </Text>
             </View>
           )}
@@ -134,16 +134,16 @@ export default function AgreementScreen({ navigation }) {
                   {checked && <Icon name={Icons.check} size={13} color={colors.white} />}
                 </View>
                 <Text style={s.checkLabel}>
-                  Main ye ghoshna karta/karti hoon ki maine upar diya hua agreement poora padh liya hai aur main iske saare terms aur conditions se sehmat hoon.
+                  I hereby declare that I have read the above agreement in full and agree to all its terms and conditions.
                 </Text>
               </TouchableOpacity>
 
               <View style={s.sigBox}>
-                <Text style={s.sigLabel}>Naam as Signature *</Text>
+                <Text style={s.sigLabel}>Name as Signature *</Text>
                 <TextInput
                   style={s.sigInput}
                   value={mySignature} onChangeText={setMySignature}
-                  placeholder="Apna poora naam likhein"
+                  placeholder="Enter your full name"
                   placeholderTextColor={colors.onSurfaceMuted}
                 />
               </View>

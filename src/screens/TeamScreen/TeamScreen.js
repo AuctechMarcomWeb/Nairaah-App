@@ -1,1002 +1,792 @@
-import React, { useState, useEffect, useCallback } from 'react';
+/**
+ * TeamScreen — My Distributor Network
+ * Mirrors MLM-Admin → /distributor/downline-tree
+ * 3 view modes: Tree | Levels | Table
+ */
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, TextInput,
-  Modal, FlatList, Linking, Alert, ActivityIndicator, RefreshControl,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  StatusBar, TextInput, Modal, FlatList, Linking,
+  Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
-import { AppHeader, Divider, StatusChip, LevelBadge } from '../../components';
+import { AppHeader, Divider, StatusChip } from '../../components';
 import Icon, { Icons } from '../../components/Icon';
-import { LEVEL_LABELS, LEVEL_COLORS } from '../../constants/levels';
-import { getMyTeam, getDownlineUsers } from '../../api/team';
+import { getMyTeam } from '../../api/team';
 
-// ── Phone call helper ─────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
+const BRAND = colors.primary;
+const LEVEL_ORDER = ['A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+const LEVEL_COLORS = {
+  'A+': '#7C3AED', 'A': '#1A73E8', 'B': '#059669', 'C': '#D97706',
+  'D': '#DC2626', 'E': '#0891B2', 'F': '#7C3AED', 'G': '#059669',
+  'H': '#D97706', 'I': '#DC2626', 'J': '#0891B2', 'K': '#6B7280',
+};
+const FALLBACK_COLORS = Object.values(LEVEL_COLORS);
+
+function getLevelColor(distributorLevel, relLevel) {
+  if (distributorLevel && LEVEL_COLORS[distributorLevel]) return LEVEL_COLORS[distributorLevel];
+  return FALLBACK_COLORS[(relLevel - 1) % FALLBACK_COLORS.length] || colors.primary;
+}
+function getLevelLabel(distributorLevel, relLevel) {
+  if (distributorLevel) return distributorLevel;
+  return LEVEL_ORDER[relLevel] || `L${relLevel}`;
+}
+
+function getKids(node) { return node?.team || node?.children || []; }
+
+function flattenAll(members, relLevel = 1) {
+  let out = [];
+  members.forEach(m => {
+    out.push({ ...m, relLevel });
+    const kids = getKids(m);
+    if (kids.length) out = out.concat(flattenAll(kids, relLevel + 1));
+  });
+  return out;
+}
+
+function findNode(members, id) {
+  for (const m of members) {
+    if (String(m._id || m.id) === String(id)) return m;
+    const kids = getKids(m);
+    if (kids.length) { const f = findNode(kids, id); if (f) return f; }
+  }
+  return null;
+}
+
+function fmtBiz(n) {
+  if (!n) return '₹0';
+  return n >= 100000 ? `₹${(n / 100000).toFixed(0)}L`
+    : n >= 1000 ? `₹${(n / 1000).toFixed(0)}K`
+    : `₹${n}`;
+}
+
 function makeCall(mobile) {
-  const cleaned = mobile.replace(/\s+/g, '');
+  const cleaned = (mobile || '').replace(/\s+/g, '');
+  if (!cleaned) return;
   Linking.canOpenURL(`tel:${cleaned}`)
     .then(ok => ok ? Linking.openURL(`tel:${cleaned}`) : Alert.alert('Error', 'Dialer not supported'))
     .catch(() => Alert.alert('Error', 'Could not open dialer'));
 }
 
-// ── Flatten all members by level ──────────────────────────
-function flattenByLevel(members, currentLevel) {
-  let result = [];
-  members.forEach(m => {
-    result.push({ ...m, level: currentLevel });
-    if (m.children && m.children.length > 0)
-      result = result.concat(flattenByLevel(m.children, currentLevel + 1));
-  });
-  return result;
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+function Av({ name, color, size = 40 }) {
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color + '20', borderWidth: 2, borderColor: color + '55', alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontWeight: '800', fontSize: size * 0.4, color }}>{(name || '?').charAt(0).toUpperCase()}</Text>
+    </View>
+  );
 }
 
-// ── Member Detail Modal (center) ──────────────────────────
-function MemberDetailModal({ visible, member, onClose, onViewDownline }) {
+// ─── Member Detail Bottom Sheet ───────────────────────────────────────────────
+function MemberSheet({ member, rootMembers, onClose, onDrill }) {
   if (!member) return null;
-  const levelColor = LEVEL_COLORS[member.level] || colors.primary;
+  const lc = getLevelColor(member.distributorLevel, member.relLevel);
+  const lb = getLevelLabel(member.distributorLevel, member.relLevel);
+  const node = findNode(rootMembers, member._id || member.id);
+  const hasKids = getKids(node).length > 0;
+  const phone = member.mobile || member.phone || '';
+  const isActive = member.isActive !== false && member.distributorStatus !== 'Inactive';
+
+  const rows = [
+    ['Joined',        (member.joiningDate || member.joinDate) ? new Date(member.joiningDate || member.joinDate).toLocaleDateString('en-IN') : '—'],
+    ['Direct Team',   member.directTeam ?? getKids(node).length],
+    ['Total Team',    member.totalTeam ?? '—'],
+    ['Level',         lb],
+    ['Referral Code', member.referralCode || '—'],
+    ['Direct Units',  member.directUnitSale ?? '—'],
+    ['Direct Biz',    member.directBusinessAmount != null ? fmtBiz(member.directBusinessAmount) : '—'],
+    ['Team Units',    member.teamUnitSale ?? '—'],
+    ['Team Biz',      member.teamBusinessAmount != null ? fmtBiz(member.teamBusinessAmount) : '—'],
+    ['Total Units',   member.totalUnitSale ?? '—'],
+    ['Total Biz',     member.totalBusinessAmount != null ? fmtBiz(member.totalBusinessAmount) : '—'],
+    ['Commission',    member.totalCommission != null ? fmtBiz(member.totalCommission) : '—'],
+  ];
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={detailMd.overlay}>
-        <View style={detailMd.card}>
-          {/* Avatar + name */}
-          <View style={detailMd.avatarRow}>
-            <View style={[detailMd.avatar, { backgroundColor: levelColor + '22' }]}>
-              <Text style={[detailMd.avatarText, { color: levelColor }]}>
-                {member.name.charAt(0)}
-              </Text>
-            </View>
-            <View style={detailMd.avatarInfo}>
-              <Text style={detailMd.memberName}>{member.name}</Text>
-              <Text style={detailMd.memberId}>{member.id}</Text>
-              <StatusChip status={member.isActive ? 'Active' : 'Inactive'} />
+    <Modal visible={!!member} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={sh.overlay} activeOpacity={1} onPress={onClose} />
+      <View style={sh.sheet}>
+        <View style={sh.handle} />
+
+        {/* Header */}
+        <View style={[sh.headerRow, { borderLeftWidth: 4, borderLeftColor: lc }]}>
+          <Av name={member.name} color={lc} size={44} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={sh.name}>{member.name}</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+              <View style={[sh.lvBadge, { backgroundColor: lc + '18', borderColor: lc }]}>
+                <Text style={[sh.lvBadgeTxt, { color: lc }]}>Level {lb}</Text>
+              </View>
+              <View style={[sh.statusDot, { backgroundColor: isActive ? '#dcfce7' : '#f3f4f6' }]}>
+                <View style={[sh.dot, { backgroundColor: isActive ? '#059669' : '#9ca3af' }]} />
+                <Text style={[sh.statusTxt, { color: isActive ? '#059669' : '#9ca3af' }]}>{isActive ? 'Active' : 'Inactive'}</Text>
+              </View>
             </View>
           </View>
+          <TouchableOpacity style={sh.closeX} onPress={onClose}>
+            <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} />
+          </TouchableOpacity>
+        </View>
 
-          <Divider style={{ marginVertical: 14 }} />
-
-          {/* Phone Number — prominent with call button */}
-          <View style={detailMd.phoneBox}>
-            <View style={detailMd.phoneLeft}>
-              <Text style={detailMd.phoneLabel}>Mobile Number</Text>
-              <Text style={detailMd.phoneNumber}>{member.mobile}</Text>
+        {/* Phone */}
+        {phone ? (
+          <View style={[sh.phoneBox, { backgroundColor: lc + '12', borderColor: lc + '44' }]}>
+            <Icon name={Icons.phone} size={18} color={lc} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={sh.phoneLabel}>Mobile</Text>
+              <Text style={[sh.phoneNum, { color: lc }]}>{phone}</Text>
             </View>
-            <TouchableOpacity
-              style={detailMd.callBtn}
-              onPress={() => makeCall(member.mobile)}>
-              <Icon name={Icons.phone} size={20} color={colors.white} />
-              <Text style={detailMd.callText}>Call</Text>
+            <TouchableOpacity style={[sh.callBtn, { backgroundColor: lc }]} onPress={() => makeCall(phone)}>
+              <Icon name={Icons.phone} size={14} color="#fff" />
+              <Text style={sh.callTxt}>Call</Text>
             </TouchableOpacity>
           </View>
+        ) : null}
 
-          <Divider style={{ marginVertical: 14 }} />
-
-          {/* Other details */}
-          {[
-            [Icons.idCard,   'Distributor ID', member.id],
-            [Icons.upline,   'Referrer',        member.uplineName || member.sponsorName || member.referredBy || '-'],
-            [Icons.joinDate, 'Join Date',        member.joinDate],
-            [Icons.payout,   'Total Business',  `₹${member.totalBusiness.toLocaleString()}`],
-            [Icons.commission,'Total Earning',  `₹${member.totalEarning.toLocaleString()}`],
-          ].map(([icon, label, value]) => (
-            <View key={label} style={detailMd.row}>
-              <Icon name={icon} size={15} color={colors.primary} style={{ marginRight: 8, width: 24 }} />
-              <Text style={detailMd.rowLabel}>{label}</Text>
-              <Text style={detailMd.rowVal}>{value}</Text>
+        {/* Stats grid */}
+        <View style={sh.grid}>
+          {rows.map(([label, val]) => (
+            <View key={label} style={sh.gridCell}>
+              <Text style={sh.gridLabel}>{label}</Text>
+              <Text style={sh.gridVal}>{val}</Text>
             </View>
           ))}
-          {/* MLM Level row with badge */}
-          <View style={detailMd.row}>
-            <Icon name={Icons.level} size={15} color={colors.primary} style={{ marginRight: 8, width: 24 }} />
-            <Text style={detailMd.rowLabel}>MLM Level</Text>
-            <LevelBadge level={member.mlmLevel || LEVEL_LABELS[member.level]} size="sm" />
-          </View>
-
-          <Divider style={{ marginVertical: 14 }} />
-
-          {/* View Downline button — only if member has children */}
-          {findMemberNode(teamData, member.id)?.children?.length > 0 && (
-            <TouchableOpacity style={detailMd.downlineBtn} onPress={onViewDownline}>
-              <Icon name={Icons.downline} size={18} color={colors.primary} />
-              <Text style={detailMd.downlineBtnText}>
-                View {member.name.split(' ')[0]}'s Downline
-              </Text>
-              <Text style={detailMd.downlineBtnArrow}>›</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={detailMd.closeBtn} onPress={onClose}>
-            <Text style={detailMd.closeBtnText}>Close</Text>
-          </TouchableOpacity>
         </View>
+
+        {/* Drill button */}
+        {hasKids && (
+          <TouchableOpacity style={[sh.drillBtn, { backgroundColor: lc + '12', borderColor: lc + '55' }]} onPress={onDrill}>
+            <Icon name={Icons.downline} size={18} color={lc} />
+            <Text style={[sh.drillTxt, { color: lc }]}>View {member.name?.split(' ')[0]}'s Downline</Text>
+            <Icon name={Icons.chevronRight} size={14} color={lc} />
+          </TouchableOpacity>
+        )}
       </View>
     </Modal>
   );
 }
 
-const detailMd = StyleSheet.create({
-  overlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20,
-  },
-  card: {
-    backgroundColor: colors.surface, borderRadius: 24,
-    padding: spacing.xl, width: '100%',
-    elevation: 16, shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20,
-  },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 26, fontWeight: '800' },
-  avatarInfo: { flex: 1 },
-  memberName: { ...typography.headlineSmall, color: colors.onSurface },
-  memberId: { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 2, marginBottom: 4 },
-
-  phoneBox: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.primaryContainer,
-    borderRadius: radius.lg, padding: spacing.md, gap: 12,
-  },
-  phoneLeft: { flex: 1 },
-  phoneLabel: { ...typography.labelMedium, color: colors.primaryDark },
-  phoneNumber: { ...typography.headlineSmall, color: colors.primary, marginTop: 4 },
-  callBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.md,
-    paddingHorizontal: 16, paddingVertical: 10,
-    alignItems: 'center', gap: 4,
-  },
-  callIcon: { fontSize: 20 },
-  callText: { ...typography.labelLarge, color: colors.white },
-
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  rowIcon: { fontSize: 15, width: 24, marginRight: 8 },
-  rowLabel: { ...typography.labelLarge, color: colors.onSurfaceMuted, flex: 1 },
-  rowVal: { ...typography.titleSmall, color: colors.onSurface },
-  closeBtn: {
-    height: 48, borderRadius: radius.lg,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: colors.outline,
-  },
-  closeBtnText: { ...typography.titleSmall, color: colors.onSurfaceVariant },
-  downlineBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.primaryContainer,
-    borderRadius: radius.lg, height: 50,
-    paddingHorizontal: spacing.lg, marginBottom: 10, gap: 8,
-  },
-  downlineBtnIcon: { fontSize: 18 },
-  downlineBtnText: { ...typography.titleSmall, color: colors.primary, flex: 1 },
-  downlineBtnArrow: { fontSize: 22, color: colors.primary },
+const sh = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet:      { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 32, ...elevation.level3 },
+  handle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.outline, alignSelf: 'center', marginBottom: 16 },
+  headerRow:  { flexDirection: 'row', alignItems: 'center', paddingLeft: 12, marginBottom: 14 },
+  name:       { ...typography.headlineSmall, color: colors.onSurface },
+  lvBadge:    { borderRadius: radius.full, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 2 },
+  lvBadgeTxt: { ...typography.labelMedium, fontWeight: '700' },
+  statusDot:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full },
+  dot:        { width: 6, height: 6, borderRadius: 3 },
+  statusTxt:  { ...typography.labelSmall, fontWeight: '600' },
+  closeX:     { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' },
+  phoneBox:   { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.lg, padding: 12, marginBottom: 14 },
+  phoneLabel: { ...typography.labelSmall, color: colors.onSurfaceMuted },
+  phoneNum:   { ...typography.titleMedium, fontWeight: '700', marginTop: 2 },
+  callBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 8 },
+  callTxt:    { ...typography.labelLarge, color: '#fff', fontWeight: '700' },
+  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  gridCell:   { width: '47%', backgroundColor: colors.background, borderRadius: radius.md, padding: 10 },
+  gridLabel:  { ...typography.labelSmall, color: colors.onSurfaceMuted, marginBottom: 2 },
+  gridVal:    { ...typography.titleSmall, color: colors.onSurface, fontWeight: '700' },
+  drillBtn:   { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: radius.lg, paddingVertical: 13, paddingHorizontal: 16 },
+  drillTxt:   { ...typography.titleSmall, flex: 1, fontWeight: '600' },
 });
 
-// ── Members List Modal (on level row click) ───────────────
-function MembersListModal({ visible, group, onClose, onMemberPress }) {
-  const [search, setSearch] = useState('');
-  if (!group) return null;
-  const filtered = group.members.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.id.toLowerCase().includes(search.toLowerCase()) ||
-    m.mobile.includes(search),
-  );
+// ─── Sponsor / Root Banner ────────────────────────────────────────────────────
+function RootBanner({ viewStack, sponsorInfo, currentMembers }) {
+  const isRoot = viewStack.length <= 1;
+  const root = isRoot ? null : viewStack[viewStack.length - 1].root;
+  const name  = isRoot ? (sponsorInfo?.name || '—')  : (root?.name || '—');
+  const phone = isRoot ? (sponsorInfo?.phone || '')   : (root?.mobile || root?.phone || '');
+  const level = isRoot ? (sponsorInfo?.distributorLevel || '') : (root?.distributorLevel || '');
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={listMd.overlay}>
-        <View style={listMd.card}>
-          {/* Header */}
-          <View style={listMd.header}>
-            <View style={[listMd.levelBadge, { backgroundColor: group.color + '20', borderColor: group.color }]}>
-              <Text style={[listMd.levelBadgeText, { color: group.color }]}>Level {group.label}</Text>
-            </View>
-            <Text style={listMd.headerTitle}>Members</Text>
-            <Text style={listMd.headerCount}>{group.members.length}</Text>
-          </View>
+    <View style={rb.banner}>
+      <View style={rb.avatarCircle}>
+        <Text style={rb.avatarTxt}>{(name || '?').charAt(0).toUpperCase()}</Text>
+      </View>
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={rb.eyebrow}>{isRoot ? 'YOUR SPONSOR / UPLINE' : 'VIEWING DOWNLINE OF'}</Text>
+        <Text style={rb.name}>{name}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+          {level ? <View style={rb.lvChip}><Text style={rb.lvTxt}>Lv {level}</Text></View> : null}
+          {!isRoot ? <Text style={rb.direct}>{currentMembers.length} direct</Text> : null}
+        </View>
+      </View>
+      {!isRoot && phone ? (
+        <TouchableOpacity style={rb.callBtn} onPress={() => makeCall(phone)}>
+          <Icon name={Icons.phone} size={18} color="#fff" />
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+const rb = StyleSheet.create({
+  banner:      { borderRadius: 16, padding: 14, marginBottom: 14, backgroundColor: BRAND, ...elevation.level2 },
+  avatarCircle:{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+  avatarTxt:   { fontWeight: '800', fontSize: 20, color: '#fff' },
+  eyebrow:     { fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.8, marginBottom: 2 },
+  name:        { fontWeight: '800', fontSize: 16, color: '#fff' },
+  lvChip:      { backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  lvTxt:       { fontSize: 10, fontWeight: '700', color: '#fff' },
+  direct:      { fontSize: 10, color: 'rgba(255,255,255,0.55)' },
+  callBtn:     { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+});
 
-          {/* Search */}
-          <View style={listMd.searchBox}>
-            <Icon name={Icons.search} size={16} color={colors.onSurfaceMuted} style={{ marginLeft: 10 }} />
-            <TextInput
-              style={listMd.searchInput}
-              placeholder="Search name, ID or mobile..."
-              placeholderTextColor={colors.onSurfaceMuted}
-              value={search}
-              onChangeText={setSearch}
-              autoFocus
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} style={{ marginRight: 8 }} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <Divider style={{ marginBottom: 4 }} />
-
-          {/* List */}
-          <FlatList
-            data={filtered}
-            keyExtractor={i => i.id}
-            style={listMd.list}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <Divider />}
-            ListEmptyComponent={
-              <View style={listMd.empty}>
-                <Icon name={Icons.emptySearch} size={40} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 6 }} />
-                <Text style={listMd.emptyText}>No members found</Text>
-              </View>
-            }
-            renderItem={({ item }) => (
+// ─── Breadcrumb ───────────────────────────────────────────────────────────────
+function Breadcrumb({ viewStack, onJump }) {
+  if (viewStack.length <= 1) return null;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+      <View style={bc.row}>
+        <TouchableOpacity onPress={() => onJump(0)} style={bc.youChip}>
+          <Text style={bc.youTxt}>You</Text>
+        </TouchableOpacity>
+        {viewStack.filter(v => v.root).map((v, i, arr) => {
+          const isLast = i === arr.length - 1;
+          const lc = getLevelColor(v.root?.distributorLevel, i + 1);
+          return (
+            <View key={v.root._id || v.root.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={bc.sep}>/</Text>
               <TouchableOpacity
-                style={listMd.memberRow}
-                onPress={() => { setSearch(''); onMemberPress(item); }}
-                activeOpacity={0.7}>
-                <View style={[listMd.memberAvatar, { backgroundColor: group.color + '18' }]}>
-                  <Text style={[listMd.memberAvatarText, { color: group.color }]}>
-                    {item.name.charAt(0)}
-                  </Text>
-                </View>
-                <View style={listMd.memberInfo}>
-                  <Text style={listMd.memberName}>{item.name}</Text>
-                  {/* Phone number visible directly */}
-                  <Text style={listMd.memberPhone}>{item.mobile}</Text>
-                  <Text style={listMd.memberMeta}>{item.id} · Joined {item.joinDate}</Text>
-                </View>
-                <View style={listMd.memberRight}>
-                  <StatusChip status={item.isActive ? 'Active' : 'Inactive'} />
-                  <TouchableOpacity
-                    style={listMd.callMiniBtn}
-                    onPress={() => makeCall(item.mobile)}>
-                    <Icon name={Icons.phone} size={14} color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
+                onPress={() => !isLast && onJump(i + 2)}
+                style={[bc.chip, { backgroundColor: isLast ? colors.surfaceVariant : lc + '18' }]}
+              >
+                <Text style={[bc.chipTxt, { color: isLast ? colors.onSurface : lc, fontWeight: isLast ? '800' : '600' }]}>
+                  {v.root.name?.split(' ')[0]}
+                </Text>
               </TouchableOpacity>
-            )}
-          />
-
-          <Divider style={{ marginTop: 6 }} />
-          <TouchableOpacity style={listMd.closeBtn} onPress={() => { setSearch(''); onClose(); }}>
-            <Text style={listMd.closeBtnText}>Close</Text>
-          </TouchableOpacity>
-        </View>
+            </View>
+          );
+        })}
       </View>
-    </Modal>
+    </ScrollView>
+  );
+}
+const bc = StyleSheet.create({
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surfaceVariant, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
+  youChip: { backgroundColor: BRAND + '18', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+  youTxt:  { fontSize: 12, fontWeight: '700', color: BRAND },
+  sep:     { fontSize: 13, color: colors.outline, marginHorizontal: 2 },
+  chip:    { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+  chipTxt: { fontSize: 12 },
+});
+
+// ─── Tree View ────────────────────────────────────────────────────────────────
+function TreeNode({ member, depth, rootMembers, onSelect, drillInto }) {
+  const kids = getKids(member);
+  const hasKids = kids.length > 0;
+  const [open, setOpen] = useState(depth < 1);
+  const lc = getLevelColor(member.distributorLevel, depth + 1);
+  const lb = getLevelLabel(member.distributorLevel, depth + 1);
+  const isActive = member.isActive !== false && member.distributorStatus !== 'Inactive';
+
+  return (
+    <View style={{ marginLeft: depth === 0 ? 0 : 14 }}>
+      <View style={tv.nodeRow}>
+        {depth > 0 && <View style={[tv.connector, { backgroundColor: lc + '35' }]} />}
+        <TouchableOpacity
+          style={[tv.card, { borderLeftColor: lc }]}
+          onPress={() => hasKids ? drillInto({ ...member, relLevel: depth + 1 }) : onSelect({ ...member, relLevel: depth + 1 })}
+          activeOpacity={0.85}
+        >
+          {/* expand/collapse */}
+          {hasKids ? (
+            <TouchableOpacity
+              style={[tv.toggle, { backgroundColor: open ? lc : '#fff', borderColor: lc }]}
+              onPress={(e) => { e.stopPropagation?.(); setOpen(o => !o); }}
+            >
+              <Text style={[tv.toggleTxt, { color: open ? '#fff' : lc }]}>{open ? '−' : '+'}</Text>
+            </TouchableOpacity>
+          ) : <View style={{ width: 22 }} />}
+
+          <Av name={member.name} color={lc} size={40} />
+
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Text style={tv.memberName}>{member.name}</Text>
+              <View style={[tv.lvBadge, { backgroundColor: lc + '18', borderColor: lc }]}>
+                <Text style={[tv.lvTxt, { color: lc }]}>Lv {lb}</Text>
+              </View>
+              <View style={[tv.statusDot, { backgroundColor: isActive ? '#059669' : '#9ca3af' }]} />
+            </View>
+            <Text style={[tv.phone, { color: lc }]}>{member.mobile || member.phone || ''}</Text>
+            {hasKids && <Text style={tv.directCount}>{kids.length} direct</Text>}
+          </View>
+
+          {/* info button */}
+          <TouchableOpacity
+            style={[tv.infoBtn, { backgroundColor: lc + '18', borderColor: lc + '44' }]}
+            onPress={() => onSelect({ ...member, relLevel: depth + 1 })}
+          >
+            <Text style={[tv.infoTxt, { color: lc }]}>i</Text>
+          </TouchableOpacity>
+
+          {hasKids && <Icon name={Icons.chevronRight} size={11} color={lc} />}
+        </TouchableOpacity>
+      </View>
+
+      {hasKids && open && (
+        <View style={[tv.childrenBox, { borderLeftColor: lc + '20' }]}>
+          {kids.map(child => (
+            <TreeNode
+              key={child._id || child.id}
+              member={child}
+              depth={depth + 1}
+              rootMembers={rootMembers}
+              onSelect={onSelect}
+              drillInto={drillInto}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+const tv = StyleSheet.create({
+  nodeRow:     { flexDirection: 'row', alignItems: 'stretch' },
+  connector:   { width: 14, borderRadius: 1 },
+  card:        { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 12, marginBottom: 5, backgroundColor: colors.surface, borderLeftWidth: 3, ...elevation.level1 },
+  toggle:      { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 8, flexShrink: 0 },
+  toggleTxt:   { fontWeight: '700', fontSize: 15, lineHeight: 18 },
+  memberName:  { ...typography.titleSmall, color: colors.onSurface },
+  lvBadge:     { borderRadius: 999, borderWidth: 1.5, paddingHorizontal: 7, paddingVertical: 1 },
+  lvTxt:       { fontSize: 10, fontWeight: '700' },
+  statusDot:   { width: 7, height: 7, borderRadius: 4 },
+  phone:       { ...typography.labelMedium, fontWeight: '600', marginTop: 2 },
+  directCount: { fontSize: 10, color: colors.onSurfaceMuted, marginTop: 2 },
+  infoBtn:     { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  infoTxt:     { fontWeight: '700', fontSize: 13 },
+  childrenBox: { paddingLeft: 14, borderLeftWidth: 2, marginLeft: 8, marginBottom: 4 },
+});
+
+// ─── Levels View ─────────────────────────────────────────────────────────────
+function LevelsView({ currentMembers, rootMembers, onSelect, drillInto, isRoot }) {
+  const flat = flattenAll(currentMembers, 1);
+  const grouped = {};
+  flat.forEach(m => {
+    const lbl = m.distributorLevel || `L${m.relLevel}`;
+    if (!grouped[lbl]) grouped[lbl] = [];
+    grouped[lbl].push(m);
+  });
+  const groups = LEVEL_ORDER.filter(l => grouped[l]).map(l => ({ label: l, color: getLevelColor(l, 1), members: grouped[l] }));
+  Object.keys(grouped).filter(l => !LEVEL_ORDER.includes(l)).forEach(l => {
+    groups.push({ label: l, color: getLevelColor(l, 1), members: grouped[l] });
+  });
+
+  if (groups.length === 0) return <EmptyState />;
+
+  return (
+    <View>
+      {groups.map((group, idx) => (
+        <LevelGroup
+          key={group.label} group={group} idx={idx} isRoot={isRoot}
+          rootMembers={rootMembers} drillInto={drillInto} onSelect={onSelect}
+        />
+      ))}
+    </View>
   );
 }
 
-const listMd = StyleSheet.create({
-  overlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16,
-  },
-  card: {
-    backgroundColor: colors.surface, borderRadius: 24,
-    padding: spacing.lg, width: '100%', maxHeight: '82%',
-    elevation: 16, shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  levelBadge: { borderRadius: radius.full, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 3 },
-  levelBadgeText: { ...typography.labelLarge },
-  headerTitle: { ...typography.headlineSmall, color: colors.onSurface, flex: 1 },
-  headerCount: {
-    backgroundColor: colors.primaryContainer, borderRadius: radius.full,
-    paddingHorizontal: 10, paddingVertical: 3,
-    ...typography.titleSmall, color: colors.primary,
-  },
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.background, borderRadius: radius.md,
-    borderWidth: 1.5, borderColor: colors.outline,
-    paddingHorizontal: spacing.md, height: 44, marginBottom: 10,
-  },
-  searchIcon: { fontSize: 14, marginRight: 6 },
-  searchInput: { flex: 1, ...typography.bodyMedium, color: colors.onSurface },
-  clearBtn: { fontSize: 13, color: colors.onSurfaceMuted, padding: 4 },
-  list: { maxHeight: 300 },
-  memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  memberAvatar: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center', marginRight: 10,
-  },
-  memberAvatarText: { fontSize: 20, fontWeight: '700' },
-  memberInfo: { flex: 1 },
-  memberName: { ...typography.titleSmall, color: colors.onSurface },
-  memberPhone: { ...typography.titleSmall, color: colors.primary, marginTop: 2 },
-  memberMeta: { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 1 },
-  memberRight: { alignItems: 'flex-end', gap: 6 },
-  callMiniBtn: {
-    backgroundColor: colors.successContainer, borderRadius: radius.full,
-    width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
-  },
-  callMiniIcon: { fontSize: 16 },
-  empty: { alignItems: 'center', paddingVertical: 24 },
-  emptyIcon: { fontSize: 32, marginBottom: 8 },
-  emptyText: { ...typography.bodyMedium, color: colors.onSurfaceMuted },
-  closeBtn: {
-    height: 46, borderRadius: radius.lg, marginTop: 10,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: colors.outline,
-  },
-  closeBtnText: { ...typography.titleSmall, color: colors.onSurfaceVariant },
-});
-
-// ── Find member's full node in tree ──────────────────────
-function findMemberNode(members, targetId) {
-  for (const m of members) {
-    if (m.id === targetId) return m;
-    if (m.children && m.children.length > 0) {
-      const found = findMemberNode(m.children, targetId);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-// ── Flatten subtree by relative level ────────────────────
-function flattenSubtree(members, relativeLevel) {
-  let result = [];
-  members.forEach(m => {
-    result.push({ ...m, relativeLevel });
-    if (m.children && m.children.length > 0)
-      result = result.concat(flattenSubtree(m.children, relativeLevel + 1));
-  });
-  return result;
-}
-
-// REL_LEVEL_LABELS / REL_LEVEL_COLORS = same as LEVEL_LABELS / LEVEL_COLORS (imported from constants)
-const REL_LEVEL_LABELS = LEVEL_LABELS;
-const REL_LEVEL_COLORS = LEVEL_COLORS;
-
-// ── Member Downline Modal — recursive nav stack ───────────
-function MemberRow({ item, lc, hasKids, onDrillIn }) {
+function LevelGroup({ group, idx, isRoot, rootMembers, drillInto, onSelect }) {
+  const [open, setOpen] = useState(true);
+  const displayLabel = isRoot ? group.label : String.fromCharCode(66 + idx);
   return (
-    <TouchableOpacity
-      style={dlMd.memberRow}
-      onPress={() => hasKids && onDrillIn(item)}
-      activeOpacity={hasKids ? 0.75 : 1}>
-      <View style={[dlMd.memberAvatar, { backgroundColor: lc + '18' }]}>
-        <Text style={[dlMd.memberAvatarText, { color: lc }]}>{item.name.charAt(0)}</Text>
-      </View>
-      <View style={dlMd.memberInfo}>
-        <Text style={dlMd.memberName}>{item.name}</Text>
-        <Text style={dlMd.memberPhone}>{item.mobile}</Text>
-        <Text style={dlMd.memberMeta}>{item.id} · Joined {item.joinDate}</Text>
-      </View>
-      <View style={dlMd.memberRight}>
-        <StatusChip status={item.isActive ? 'Active' : 'Inactive'} />
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-          <TouchableOpacity style={dlMd.callBtn} onPress={() => makeCall(item.mobile)}>
-            <Icon name={Icons.phone} size={14} color={colors.primary} />
-          </TouchableOpacity>
-          {hasKids && (
-            <TouchableOpacity style={dlMd.drillBtn} onPress={() => onDrillIn(item)}>
-              <Icon name={Icons.chevronRight} size={18} color={colors.primary} />
-            </TouchableOpacity>
-          )}
+    <View style={{ marginBottom: 20 }}>
+      <View style={lv.groupHeader}>
+        <View style={[lv.levelBadge, { backgroundColor: group.color + '18', borderColor: group.color }]}>
+          <Text style={[lv.levelTxt, { color: group.color }]}>Level {displayLabel}</Text>
         </View>
+        <TouchableOpacity
+          style={[lv.toggle, { backgroundColor: open ? group.color : '#fff', borderColor: group.color }]}
+          onPress={() => setOpen(o => !o)}
+        >
+          <Text style={[lv.toggleTxt, { color: open ? '#fff' : group.color }]}>{open ? '−' : '+'}</Text>
+        </TouchableOpacity>
+        <View style={[lv.countBadge, { backgroundColor: group.color + '18', borderColor: group.color + '44' }]}>
+          <Text style={[lv.countTxt, { color: group.color }]}>{group.members.length}</Text>
+        </View>
+        <View style={[lv.line, { backgroundColor: group.color + '25' }]} />
+      </View>
+      {open && group.members.map(m => {
+        const hasKids = getKids(findNode(rootMembers, m._id || m.id)).length > 0;
+        return (
+          <MemberCard
+            key={m._id || m.id} member={m} color={group.color}
+            hasKids={hasKids}
+            onPress={() => hasKids ? drillInto(m) : onSelect(m)}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+function MemberCard({ member, color, hasKids, onPress }) {
+  const phone = member.mobile || member.phone || '';
+  const isActive = member.isActive !== false && member.distributorStatus !== 'Inactive';
+  return (
+    <TouchableOpacity style={[mc.card, { borderLeftColor: color }]} onPress={onPress} activeOpacity={0.85}>
+      <Av name={member.name} color={color} size={46} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Text style={mc.name}>{member.name}</Text>
+          <View style={[mc.statusDot, { backgroundColor: isActive ? '#dcfce7' : '#f3f4f6' }]}>
+            <View style={[mc.dot, { backgroundColor: isActive ? '#059669' : '#9ca3af' }]} />
+            <Text style={[mc.statusTxt, { color: isActive ? '#059669' : '#9ca3af' }]}>{isActive ? 'Active' : 'Inactive'}</Text>
+          </View>
+        </View>
+        <Text style={[mc.phone, { color }]}>{phone}</Text>
+        {(member.totalBusinessAmount > 0 || member.directTeam > 0) && (
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 3 }}>
+            {member.totalBusinessAmount > 0 && <Text style={mc.meta}>{fmtBiz(member.totalBusinessAmount)}</Text>}
+            {(member.directTeam || 0) > 0 && <Text style={mc.meta}>{member.directTeam} direct</Text>}
+          </View>
+        )}
+      </View>
+      <View style={[mc.arrow, { backgroundColor: hasKids ? color + '18' : colors.surfaceVariant, borderColor: hasKids ? color + '44' : colors.outline }]}>
+        {hasKids
+          ? <Icon name={Icons.chevronRight} size={12} color={color} />
+          : <Icon name={Icons.customer} size={11} color={colors.onSurfaceMuted} />}
       </View>
     </TouchableOpacity>
   );
 }
 
-function MemberDownlineModal({ visible, member, onClose, treeData = [] }) {
-  const [navStack, setNavStack] = useState([]);
-  const [search, setSearch] = useState('');
-
-  React.useEffect(() => {
-    if (visible && member) { setNavStack([member]); setSearch(''); }
-  }, [visible, member?.id]);
-
-  if (!visible || navStack.length === 0) return null;
-
-  const currentRoot = navStack[navStack.length - 1];
-  const fullNode = findMemberNode(treeData, currentRoot.id);
-  const children = fullNode?.children || [];
-  const subtreeFlat = flattenSubtree(children, 1);
-
-  const maxLevel = subtreeFlat.length > 0 ? Math.max(...subtreeFlat.map(m => m.relativeLevel)) : 0;
-  const levelGroups = [];
-  for (let lvl = 1; lvl <= maxLevel; lvl++) {
-    const ms = subtreeFlat.filter(m => m.relativeLevel === lvl);
-    if (ms.length > 0) levelGroups.push({ level: lvl, label: REL_LEVEL_LABELS[lvl] || `L${lvl}`, members: ms });
-  }
-
-  const searchFiltered = search.trim().length > 0
-    ? subtreeFlat.filter(m =>
-        m.name.toLowerCase().includes(search.toLowerCase()) ||
-        m.id.toLowerCase().includes(search.toLowerCase()))
-    : [];
-
-  const drillInto = (m) => { setSearch(''); setNavStack(prev => [...prev, m]); };
-  const goBack = () => { setSearch(''); setNavStack(prev => prev.slice(0, -1)); };
-  const handleClose = () => { setNavStack([]); setSearch(''); onClose(); };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={dlMd.overlay}>
-        <View style={dlMd.card}>
-
-          {/* Header */}
-          <View style={dlMd.header}>
-            {navStack.length > 1 ? (
-              <TouchableOpacity style={dlMd.backBtn} onPress={goBack}>
-                <Icon name={Icons.back} size={22} color={colors.primary} />
-              </TouchableOpacity>
-            ) : (
-              <View style={dlMd.headerAvatar}>
-                <Text style={dlMd.headerAvatarText}>{currentRoot.name.charAt(0)}</Text>
-              </View>
-            )}
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              {/* Breadcrumb */}
-              {navStack.length > 1 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 2 }}>
-                  <Text style={dlMd.breadcrumb}>
-                    {navStack.map((m, i) => m.name.split(' ')[0] + (i < navStack.length - 1 ? ' › ' : '')).join('')}
-                  </Text>
-                </ScrollView>
-              )}
-              <Text style={dlMd.headerName}>{currentRoot.name.split(' ')[0]}'s Downline</Text>
-              <Text style={dlMd.headerSub}>
-                {subtreeFlat.length} member{subtreeFlat.length !== 1 ? 's' : ''}
-                {levelGroups.length > 0 ? ` · ${levelGroups.length} level${levelGroups.length !== 1 ? 's' : ''}` : ''}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={handleClose} style={dlMd.xBtn}>
-              <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Search */}
-          <View style={dlMd.searchBox}>
-            <Icon name={Icons.search} size={15} color={colors.onSurfaceMuted} style={{ marginLeft: 10 }} />
-            <TextInput
-              style={dlMd.searchInput}
-              placeholder="Search members..."
-              placeholderTextColor={colors.onSurfaceMuted}
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Icon name={Icons.close} size={14} color={colors.onSurfaceMuted} style={{ marginRight: 8 }} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Empty */}
-          {children.length === 0 ? (
-            <View style={dlMd.emptyBox}>
-              <Icon name={Icons.emptyUser} size={36} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 6 }} />
-              <Text style={dlMd.emptyText}>{currentRoot.name.split(' ')[0]} has no downline yet.</Text>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 370 }}>
-              {search.trim().length > 0 ? (
-                <View style={dlMd.section}>
-                  <Text style={dlMd.sectionTitle}>{searchFiltered.length} result{searchFiltered.length !== 1 ? 's' : ''}</Text>
-                  {searchFiltered.length === 0
-                    ? <Text style={{ ...typography.bodySmall, color: colors.onSurfaceMuted, padding: spacing.md }}>No members match</Text>
-                    : searchFiltered.map((item, idx) => {
-                        const lc = REL_LEVEL_COLORS[item.relativeLevel] || colors.primary;
-                        const hasKids = (findMemberNode(treeData, item.id)?.children?.length || 0) > 0;
-                        return (
-                          <View key={item.id}>
-                            <MemberRow item={item} lc={lc} hasKids={hasKids} onDrillIn={drillInto} />
-                            {idx < searchFiltered.length - 1 && <Divider />}
-                          </View>
-                        );
-                      })}
-                </View>
-              ) : (
-                levelGroups.map(group => {
-                  const lc = REL_LEVEL_COLORS[group.level] || colors.primary;
-                  return (
-                    <View key={group.label} style={dlMd.section}>
-                      <View style={[dlMd.levelHeader, { backgroundColor: lc + '15', borderLeftColor: lc }]}>
-                        <View style={[dlMd.levelBadge, { backgroundColor: lc + '25', borderColor: lc }]}>
-                          <Text style={[dlMd.levelBadgeText, { color: lc }]}>Level {group.label}</Text>
-                        </View>
-                        <Text style={[dlMd.levelCount, { color: lc }]}>{group.members.length} member{group.members.length !== 1 ? 's' : ''}</Text>
-                      </View>
-                      {group.members.map((item, idx) => {
-                        const hasKids = (findMemberNode(treeData, item.id)?.children?.length || 0) > 0;
-                        return (
-                          <View key={item.id}>
-                            <MemberRow item={item} lc={lc} hasKids={hasKids} onDrillIn={drillInto} />
-                            {idx < group.members.length - 1 && <Divider />}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  );
-                })
-              )}
-              <View style={{ height: 8 }} />
-            </ScrollView>
-          )}
-
-          <TouchableOpacity style={dlMd.closeBtn} onPress={handleClose}>
-            <Text style={dlMd.closeBtnText}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const dlMd = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
-  card: { backgroundColor: colors.surface, borderRadius: 24, padding: spacing.lg, width: '100%', maxHeight: '88%', elevation: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primaryContainer, alignItems: 'center', justifyContent: 'center' },
-  backBtnText: { fontSize: 24, color: colors.primary, fontWeight: '700', lineHeight: 28 },
-  breadcrumb: { ...typography.bodySmall, color: colors.primaryLight },
-  headerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryContainer, alignItems: 'center', justifyContent: 'center' },
-  headerAvatarText: { ...typography.titleLarge, color: colors.primary },
-  headerName: { ...typography.headlineSmall, color: colors.onSurface },
-  headerSub: { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 2 },
-  xBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' },
-  xBtnText: { fontSize: 13, color: colors.onSurfaceMuted },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.outline, paddingHorizontal: spacing.md, height: 44, marginBottom: 12 },
-  searchIcon: { fontSize: 14, marginRight: 6 },
-  searchInput: { flex: 1, ...typography.bodyMedium, color: colors.onSurface },
-  clearBtn: { fontSize: 13, color: colors.onSurfaceMuted, padding: 4 },
-  emptyBox: { alignItems: 'center', paddingVertical: 24 },
-  emptyIcon: { fontSize: 36, marginBottom: 8 },
-  emptyText: { ...typography.bodyMedium, color: colors.onSurfaceMuted, textAlign: 'center' },
-  section: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 10, borderWidth: 1, borderColor: colors.divider },
-  sectionTitle: { ...typography.titleSmall, color: colors.primary, padding: spacing.md },
-  levelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderLeftWidth: 4 },
-  levelBadge: { borderRadius: radius.full, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 3 },
-  levelBadgeText: { ...typography.labelLarge },
-  levelCount: { ...typography.titleSmall },
-  memberRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
-  memberAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  memberAvatarText: { fontSize: 19, fontWeight: '700' },
-  memberInfo: { flex: 1 },
-  memberName: { ...typography.titleSmall, color: colors.onSurface },
-  memberPhone: { ...typography.titleSmall, color: colors.primary, marginTop: 2 },
-  memberMeta: { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 1 },
-  memberRight: { alignItems: 'flex-end', gap: 4 },
-  callBtn: { backgroundColor: colors.successContainer, borderRadius: radius.full, width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  drillBtn: { backgroundColor: colors.primaryContainer, borderRadius: radius.full, width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  drillBtnText: { fontSize: 20, color: colors.primary, fontWeight: '700', lineHeight: 24 },
-  closeBtn: { height: 48, borderRadius: radius.lg, marginTop: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.outline },
-  closeBtnText: { ...typography.titleSmall, color: colors.onSurfaceVariant },
+const lv = StyleSheet.create({
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  levelBadge:  { borderRadius: 999, borderWidth: 2, paddingHorizontal: 12, paddingVertical: 3 },
+  levelTxt:    { fontWeight: '800', fontSize: 13 },
+  toggle:      { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  toggleTxt:   { fontWeight: '700', fontSize: 14, lineHeight: 16 },
+  countBadge:  { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  countTxt:    { fontWeight: '700', fontSize: 12 },
+  line:        { flex: 1, height: 1 },
+});
+const mc = StyleSheet.create({
+  card:      { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 14, marginBottom: 8, backgroundColor: colors.surface, borderLeftWidth: 3, ...elevation.level1 },
+  name:      { ...typography.titleSmall, color: colors.onSurface },
+  phone:     { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  statusDot: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.full },
+  dot:       { width: 6, height: 6, borderRadius: 3 },
+  statusTxt: { fontSize: 10, fontWeight: '600' },
+  meta:      { fontSize: 11, color: colors.onSurfaceMuted },
+  arrow:     { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 });
 
+// ─── Table View ───────────────────────────────────────────────────────────────
+function TableView({ currentMembers, rootMembers, drillInto, onSelect, isRoot }) {
+  const flat = flattenAll(currentMembers, 1);
+  const grouped = {};
+  flat.forEach(m => {
+    const lbl = m.distributorLevel || `L${m.relLevel}`;
+    if (!grouped[lbl]) grouped[lbl] = [];
+    grouped[lbl].push(m);
+  });
+  const groups = LEVEL_ORDER.filter(l => grouped[l]).map(l => ({ label: l, color: getLevelColor(l, 1), members: grouped[l] }));
+  Object.keys(grouped).filter(l => !LEVEL_ORDER.includes(l)).forEach(l => {
+    groups.push({ label: l, color: getLevelColor(l, 1), members: grouped[l] });
+  });
 
+  if (groups.length === 0) return <EmptyState />;
 
+  return (
+    <View style={[tb.table, elevation.level1]}>
+      {/* Header */}
+      <View style={tb.thead}>
+        <Text style={[tb.th, { width: 60 }]}>Level</Text>
+        <Text style={[tb.th, { width: 44 }]}>Count</Text>
+        <Text style={[tb.th, { flex: 1 }]}>Members (tap to drill in)</Text>
+      </View>
+      {groups.map((group, idx) => {
+        const displayLabel = isRoot ? group.label : String.fromCharCode(66 + idx);
+        return (
+          <View key={group.label} style={[tb.row, idx % 2 === 1 && tb.rowAlt]}>
+            <View style={{ width: 60 }}>
+              <View style={[tb.lvBadge, { backgroundColor: group.color + '18', borderColor: group.color }]}>
+                <Text style={[tb.lvTxt, { color: group.color }]}>{displayLabel}</Text>
+              </View>
+            </View>
+            <Text style={[tb.count, { width: 44, color: group.color }]}>{group.members.length}</Text>
+            <View style={[tb.chips, { flex: 1 }]}>
+              {group.members.map(m => {
+                const hasKids = getKids(findNode(rootMembers, m._id || m.id)).length > 0;
+                const isActive = m.isActive !== false && m.distributorStatus !== 'Inactive';
+                return (
+                  <TouchableOpacity
+                    key={m._id || m.id}
+                    onPress={() => hasKids ? drillInto(m) : onSelect(m)}
+                    style={[tb.chip, { backgroundColor: group.color + '12', borderColor: hasKids ? group.color + '66' : group.color + '22' }]}
+                  >
+                    {!isActive && <View style={[tb.inactiveDot]} />}
+                    <Text style={[tb.chipTxt, { color: group.color }]}>{m.name?.split(' ')[0]}</Text>
+                    {hasKids && <Icon name={Icons.chevronRight} size={9} color={group.color} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+const tb = StyleSheet.create({
+  table:    { borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface },
+  thead:    { flexDirection: 'row', alignItems: 'center', backgroundColor: BRAND, padding: 12, gap: 8 },
+  th:       { ...typography.labelSmall, color: '#fff', fontWeight: '700' },
+  row:      { flexDirection: 'row', alignItems: 'center', padding: 13, gap: 8, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  rowAlt:   { backgroundColor: colors.background },
+  lvBadge:  { borderRadius: 999, borderWidth: 2, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  lvTxt:    { fontWeight: '800', fontSize: 13 },
+  count:    { fontWeight: '800', fontSize: 20, textAlign: 'center' },
+  chips:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip:     { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 999, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 5 },
+  chipTxt:  { fontSize: 12, fontWeight: '700' },
+  inactiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
+});
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+function EmptyState() {
+  return (
+    <View style={em.wrap}>
+      <Icon name={Icons.downline} size={52} color={colors.outline} style={{ marginBottom: 14 }} />
+      <Text style={em.title}>No Downline Members Yet</Text>
+      <Text style={em.sub}>Share your referral code to start building your network</Text>
+    </View>
+  );
+}
+const em = StyleSheet.create({
+  wrap:  { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 },
+  title: { ...typography.titleLarge, color: colors.onSurface, marginBottom: 8 },
+  sub:   { ...typography.bodyMedium, color: colors.onSurfaceMuted, textAlign: 'center' },
+});
+
+// ─── View Mode Toggle ─────────────────────────────────────────────────────────
+const VIEW_MODES = [
+  { key: 'tree',   label: 'Tree',   icon: 'format-list-bulleted' },
+  { key: 'levels', label: 'Levels', icon: 'layers-outline' },
+  { key: 'table',  label: 'Table',  icon: 'table-large' },
+];
+
+// ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
 export default function TeamScreen({ navigation }) {
   const { user } = useSelector(state => state.user);
-  const [apiTeamMembers, setApiTeamMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [rootMembers, setRootMembers] = useState([]);
+  const [sponsorInfo, setSponsorInfo] = useState(null);
+  const [directTeam, setDirectTeam]   = useState(0);
+  const [totalTeam, setTotalTeam]     = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [error, setError]             = useState(null);
+
+  const [viewStack, setViewStack] = useState([]);
+  const [viewMode, setViewMode]   = useState('table');
+  const [search, setSearch]       = useState('');
+  const [selected, setSelected]   = useState(null);
 
   const fetchTeam = useCallback(async () => {
     const id = user?._id || user?.userId;
     if (!id) return;
+    setError(null);
     try {
-      const res = await getDownlineUsers(id);
+      const res = await getMyTeam(id);
       if (res.success) {
-        // Normalize API response to match expected UI shape
-        const normalize = (members) => (members || []).map(m => ({
-          ...m,
-          id: m._id || m.userId,
-          name: m.name || m.fullName || m.userId || 'Unknown',
-          mobile: m.mobile || m.phone || '-',
-          joinDate: m.joinDate || (m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-IN') : '-'),
-          isActive: m.isActive ?? m.status === 'Active' ?? true,
-          totalBusiness: m.totalBusiness || m.groupBusiness || 0,
-          totalEarning: m.totalEarning || m.totalCommission || 0,
-          mlmLevel: m.level || m.mlmLevel || '-',
-          children: normalize(m.children || m.downline || []),
-        }));
-        setApiTeamMembers(normalize(res.data?.downline || res.data || []));
+        const d = res.data?.data || res.data || {};
+        const team = d?.team || d?.downline || [];
+        setRootMembers(team);
+        setSponsorInfo(d?.sponsor || null);
+        setDirectTeam(d?.directTeam ?? 0);
+        setTotalTeam(d?.totalTeam ?? 0);
+        setViewStack([{ root: null, members: team }]);
+      } else {
+        setError(res.message || 'Failed to load team.');
       }
     } catch (e) {
-      console.error('[TEAM SCREEN] fetch error:', e);
+      setError('Failed to load your downline. Please try again.');
     }
   }, [user]);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await fetchTeam();
-      setLoading(false);
-    })();
+    (async () => { setLoading(true); await fetchTeam(); setLoading(false); })();
   }, [fetchTeam]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchTeam();
-    setRefreshing(false);
-  };
+  const onRefresh = async () => { setRefreshing(true); await fetchTeam(); setRefreshing(false); };
 
-  // Use API data, fallback to empty
-  const teamData = apiTeamMembers;
-  const allFlat = flattenByLevel(teamData, 1);
+  const currentView   = viewStack[viewStack.length - 1] || { root: null, members: [] };
+  const currentMembers = currentView.members || [];
+  const allFlat        = flattenAll(currentMembers, 1);
+  const globalFlat     = flattenAll(rootMembers, 1);
+  const totalMembers   = globalFlat.length;
+  const activeMembers  = globalFlat.filter(m => m.isActive !== false && m.distributorStatus !== 'Inactive').length;
+  const isRoot         = viewStack.length <= 1;
 
-  // ── viewStack: each item = { root, members }
-  // root = null means "self" (distributor), members = direct downline
-  const [viewStack, setViewStack] = useState([{ root: null, members: [] }]);
-
-  // Update viewStack root when teamData loads
-  useEffect(() => {
-    setViewStack([{ root: null, members: teamData }]);
-  }, [apiTeamMembers]);
-
-  const [globalSearch, setGlobalSearch] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [showDetail, setShowDetail] = useState(false);
-
-  const currentView = viewStack[viewStack.length - 1];
-  const currentRoot = currentView.root;
-  const currentMembers = currentView.members;
-
-  const totalMembers = allFlat.length;
-  const activeMembers = allFlat.filter(m => m.isActive).length;
-  const totalBusiness = allFlat.reduce((a, m) => a + (m.totalBusiness || 0), 0);
-
-  const canGoBack = viewStack.length > 1;
-
-  const currentFlat = flattenSubtree(currentMembers, 1);
-  const maxLevel = currentFlat.length > 0 ? Math.max(...currentFlat.map(m => m.relativeLevel)) : 0;
-  const currentLevelGroups = [];
-  for (let lvl = 1; lvl <= maxLevel; lvl++) {
-    const ms = currentFlat.filter(m => m.relativeLevel === lvl);
-    if (ms.length > 0) currentLevelGroups.push({
-      level: lvl,
-      label: REL_LEVEL_LABELS[lvl] || `L${lvl}`,
-      color: REL_LEVEL_COLORS[lvl] || colors.primary,
-      members: ms,
-    });
-  }
-
-  const searchResults = globalSearch.trim().length > 1
-    ? allFlat.filter(m =>
-        (m.name || '').toLowerCase().includes(globalSearch.toLowerCase()) ||
-        (m.id || '').toLowerCase().includes(globalSearch.toLowerCase()) ||
-        (m.mobile || '').includes(globalSearch))
+  const searchResults = search.trim().length > 1
+    ? globalFlat.filter(m =>
+        m.name?.toLowerCase().includes(search.toLowerCase()) ||
+        (m._id || m.id || '').toLowerCase().includes(search.toLowerCase()) ||
+        (m.mobile || m.phone || '').includes(search) ||
+        (m.referralCode || '').toLowerCase().includes(search.toLowerCase()))
     : [];
 
   const drillInto = (member) => {
-    const fullNode = findMemberNode(teamData, member.id);
-    const children = fullNode?.children || [];
-    setViewStack(prev => [...prev, { root: member, members: children }]);
-    setGlobalSearch('');
+    const node = findNode(rootMembers, member._id || member.id);
+    setViewStack(prev => [...prev, { root: member, members: getKids(node) }]);
+    setSearch(''); setSelected(null);
   };
 
-  const goBack = () => {
-    setViewStack(prev => prev.slice(0, -1));
+  const handleSelect = (member) => setSelected(member);
+
+  const handleJump = (index) => {
+    setViewStack(prev => prev.slice(0, index));
+    setSearch('');
   };
 
-  const handleMemberPress = (member) => {
-    setSelectedMember(member);
-    setShowDetail(true);
+  const handleViewMode = (mode) => {
+    setViewMode(mode);
+    setSearch('');
+    setViewStack(prev => [prev[0] || { root: null, members: rootMembers }]);
   };
-
-  const breadcrumb = viewStack
-    .filter(v => v.root !== null)
-    .map(v => (v.root.name || '').split(' ')[0])
-    .join(' › ');
 
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
-        title="Downline"
-        subtitle={`${totalMembers} total members`}
-        rightIcon="➕"
+        title="My Network"
+        subtitle={`${totalMembers} total · ${activeMembers} active`}
+        rightIconName="account-plus"
         onRightPress={() => navigation.navigate('AddMember')}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}
-        keyboardShouldPersistTaps="handled">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* View mode toggle */}
+        <View style={s.viewToggle}>
+          {VIEW_MODES.map(m => (
+            <TouchableOpacity
+              key={m.key}
+              style={[s.viewBtn, viewMode === m.key && s.viewBtnActive]}
+              onPress={() => handleViewMode(m.key)}
+            >
+              <Icon name={m.icon} size={14} color={viewMode === m.key ? colors.white : colors.onSurfaceMuted} />
+              <Text style={[s.viewBtnTxt, viewMode === m.key && s.viewBtnTxtActive]}>{m.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {/* Back bar — shown when drilled in */}
-        {canGoBack && (
-          <TouchableOpacity style={s.backBar} onPress={goBack}>
-            <Icon name={Icons.back} size={20} color={colors.primary} />
-            <Text style={s.backBarText}>
-              {breadcrumb || 'Back'}
-            </Text>
-          </TouchableOpacity>
+        {/* Sponsor / root banner */}
+        {(sponsorInfo || viewStack.length > 1) && (
+          <RootBanner viewStack={viewStack} sponsorInfo={sponsorInfo} currentMembers={currentMembers} />
         )}
 
-        {/* Upline / Current Root Card */}
-        <View style={[s.uplineCard, canGoBack && s.uplineCardActive]}>
-          {canGoBack ? (
-            // Drilled in — show current root member as "A"
-            <>
-              <View style={s.uplineLabelRow}>
-                <Text style={s.uplineLabel}>Viewing as Root (A)</Text>
-                <View style={s.rootBadge}><Text style={s.rootBadgeText}>A</Text></View>
-              </View>
-              <View style={s.uplineRow}>
-                <View style={[s.uplineAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={s.uplineAvatarText}>{currentRoot.name.charAt(0)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.uplineName}>{currentRoot.name}</Text>
-                  <Text style={s.uplineId}>{currentRoot.id} · {currentRoot.mobile}</Text>
-                </View>
-                <TouchableOpacity style={s.callBtn} onPress={() => makeCall(currentRoot.mobile)}>
-                  <Icon name={Icons.phone} size={18} color={colors.white} />
-                </TouchableOpacity>
-              </View>
-              <Text style={s.downlineCount}>
-                Direct downline: {currentMembers.length} member{currentMembers.length !== 1 ? 's' : ''}
-              </Text>
-            </>
-          ) : (
-            // Root view — show your own upline (Anil)
-            <>
-              <Text style={s.uplineLabel}>Your Upline / Sponsor</Text>
-              <View style={s.uplineRow}>
-                <View style={[s.uplineAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={s.uplineAvatarText}>{(user?.uplineName || user?.sponsorName || 'U').charAt(0)}</Text>
-                </View>
-                <View>
-                  <Text style={s.uplineName}>{user?.uplineName || user?.sponsorName || 'N/A'}</Text>
-                  <Text style={s.uplineId}>{user?.uplineId || user?.sponsorId || '-'}</Text>
-                </View>
-              </View>
-            </>
-          )}
-        </View>
-
-        {/* Summary */}
-        <View style={s.summaryRow}>
-          <View style={s.summaryItem}>
-            <Text style={s.summaryVal}>{totalMembers}</Text>
-            <Text style={s.summaryLabel}>Total</Text>
-          </View>
-          <View style={s.summaryDiv} />
-          <View style={s.summaryItem}>
-            <Text style={[s.summaryVal, { color: colors.success }]}>{activeMembers}</Text>
-            <Text style={s.summaryLabel}>Active</Text>
-          </View>
-          <View style={s.summaryDiv} />
-          <View style={s.summaryItem}>
-            <Text style={[s.summaryVal, { color: colors.pending }]}>{totalMembers - activeMembers}</Text>
-            <Text style={s.summaryLabel}>Inactive</Text>
-          </View>
-          <View style={s.summaryDiv} />
-          <View style={s.summaryItem}>
-            <Text style={[s.summaryVal, { fontSize: 14, color: colors.primary }]}>
-              ₹{(totalBusiness / 1000).toFixed(0)}K
-            </Text>
-            <Text style={s.summaryLabel}>Business</Text>
-          </View>
-        </View>
-
-        {/* Global Search */}
-        <View style={[s.searchBox, searchFocused && s.searchBoxFocused]}>
+        {/* Search */}
+        <View style={s.searchBox}>
           <Icon name={Icons.search} size={16} color={colors.onSurfaceMuted} style={{ marginLeft: 12 }} />
           <TextInput
             style={s.searchInput}
-            placeholder="Search any member by name, ID or mobile..."
+            placeholder="Search by name, ID, mobile or referral code..."
             placeholderTextColor={colors.onSurfaceMuted}
-            value={globalSearch}
-            onChangeText={setGlobalSearch}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
+            value={search}
+            onChangeText={setSearch}
           />
-          {globalSearch.length > 0 && (
-            <TouchableOpacity onPress={() => setGlobalSearch('')}>
-              <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} style={{ marginRight: 8 }} />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} style={{ marginRight: 8 }}>
+              <Icon name={Icons.close} size={16} color={colors.onSurfaceMuted} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Search Results */}
-        {globalSearch.trim().length > 1 ? (
-          <View style={s.searchResultsCard}>
-            <Text style={s.searchResultsTitle}>
-              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
-            </Text>
-            {searchResults.length === 0 ? (
-              <Text style={s.noResultText}>No members match your search</Text>
-            ) : searchResults.map((item, idx) => {
-              const lc = LEVEL_COLORS[item.level] || colors.primary;
-              const hasKids = (findMemberNode(teamData, item.id)?.children?.length || 0) > 0;
-              return (
-                <View key={item.id}>
-                  <TouchableOpacity
-                    style={s.searchResultRow}
-                    onPress={() => { setGlobalSearch(''); drillInto(item); }}
-                    activeOpacity={0.7}>
-                    <View style={[s.srAvatar, { backgroundColor: lc + '18' }]}>
-                      <Text style={[s.srAvatarText, { color: lc }]}>{item.name.charAt(0)}</Text>
-                    </View>
-                    <View style={s.srInfo}>
-                      <Text style={s.srName}>{item.name}</Text>
-                      <Text style={s.srPhone}>{item.mobile}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                        <Text style={s.srMeta}>{item.id}</Text>
-                        <LevelBadge level={item.mlmLevel || LEVEL_LABELS[item.level]} size="sm" />
-                      </View>
-                    </View>
-                    <View style={s.srRight}>
-                      <StatusChip status={item.isActive ? 'Active' : 'Inactive'} />
-                      <TouchableOpacity style={s.srCallBtn} onPress={() => makeCall(item.mobile)}>
-                        <Text style={s.srCallIcon}>📞</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                  {idx < searchResults.length - 1 && <Divider />}
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          /* Level Table */
-          <View style={s.tableCard}>
-            <View style={s.tableHeader}>
-              <Text style={[s.th, { width: 56 }]}>Level</Text>
-              <Text style={[s.th, { width: 52 }]}>Count</Text>
-              <Text style={[s.th, { flex: 1 }]}>Members (tap to drill in)</Text>
-            </View>
-
-            {currentLevelGroups.length === 0 ? (
-              <View style={s.emptyTable}>
-                <Text style={s.emptyTableIcon}>👤</Text>
-                <Text style={s.emptyTableText}>No downline members</Text>
-              </View>
-            ) : currentLevelGroups.map((group, idx) => (
-              <View key={group.label} style={[s.tableRow, idx % 2 !== 0 && s.tableRowAlt]}>
-                {/* Level badge */}
-                <View style={{ width: 56 }}>
-                  <View style={[s.levelBadge, { backgroundColor: group.color + '20', borderColor: group.color }]}>
-                    <Text style={[s.levelBadgeText, { color: group.color }]}>{group.label}</Text>
-                  </View>
-                </View>
-                {/* Count */}
-                <View style={{ width: 52, alignItems: 'center' }}>
-                  <Text style={[s.countText, { color: group.color }]}>{group.members.length}</Text>
-                </View>
-                {/* Members — horizontal chips, each tappable */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.memberChips}>
-                  {group.members.map(m => {
-                    const hasKids = (findMemberNode(teamData, m.id)?.children?.length || 0) > 0;
-                    return (
-                      <TouchableOpacity
-                        key={m.id}
-                        style={[s.nameChip, { backgroundColor: group.color + '15' }, hasKids && s.nameChipClickable]}
-                        onPress={() => drillInto(m)}
-                        activeOpacity={0.75}>
-                        <Text style={[s.nameChipText, { color: group.color }]} numberOfLines={1}>
-                          {m.name.split(' ')[0]}
-                        </Text>
-                        {hasKids && <Text style={[s.nameChipArrow, { color: group.color }]}>›</Text>}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ))}
-          </View>
+        {/* Breadcrumb */}
+        {viewStack.length > 1 && (
+          <Breadcrumb viewStack={viewStack} onJump={handleJump} />
         )}
 
-        <View style={{ height: 32 }} />
+        {/* Content */}
+        {loading ? (
+          <View style={s.loaderBox}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : error ? (
+          <View style={s.errorBox}>
+            <Text style={s.errorTxt}>{error}</Text>
+            <TouchableOpacity style={s.retryBtn} onPress={() => { setLoading(true); fetchTeam().finally(() => setLoading(false)); }}>
+              <Text style={s.retryTxt}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : search.trim().length > 1 ? (
+          // Search results
+          <View>
+            <Text style={s.searchResultsTitle}>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found</Text>
+            {searchResults.length === 0
+              ? <Text style={s.noResults}>No members match</Text>
+              : searchResults.map(m => (
+                  <MemberCard
+                    key={m._id || m.id}
+                    member={m}
+                    color={getLevelColor(m.distributorLevel, m.relLevel)}
+                    hasKids={getKids(findNode(rootMembers, m._id || m.id)).length > 0}
+                    onPress={() => {
+                      const hasKids = getKids(findNode(rootMembers, m._id || m.id)).length > 0;
+                      hasKids ? drillInto(m) : handleSelect(m);
+                    }}
+                  />
+                ))}
+          </View>
+        ) : viewMode === 'tree' ? (
+          currentMembers.length === 0 ? <EmptyState /> : (
+            <View>
+              {currentMembers.map(member => (
+                <TreeNode
+                  key={member._id || member.id}
+                  member={member}
+                  depth={0}
+                  rootMembers={rootMembers}
+                  onSelect={handleSelect}
+                  drillInto={drillInto}
+                />
+              ))}
+            </View>
+          )
+        ) : viewMode === 'levels' ? (
+          <LevelsView currentMembers={currentMembers} rootMembers={rootMembers} onSelect={handleSelect} drillInto={drillInto} isRoot={isRoot} />
+        ) : (
+          <TableView currentMembers={currentMembers} rootMembers={rootMembers} onSelect={handleSelect} drillInto={drillInto} isRoot={isRoot} />
+        )}
+
+        <View style={{ height: 30 }} />
       </ScrollView>
 
-      <MemberDetailModal
-        visible={showDetail}
-        member={selectedMember}
-        onClose={() => setShowDetail(false)}
-        onViewDownline={() => { setShowDetail(false); drillInto(selectedMember); }}
+      {/* Member Detail Sheet */}
+      <MemberSheet
+        member={selected}
+        rootMembers={rootMembers}
+        onClose={() => setSelected(null)}
+        onDrill={() => { drillInto(selected); setSelected(null); }}
       />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: spacing.lg },
-
-  backBar: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.primaryContainer,
-    borderRadius: radius.md, paddingHorizontal: spacing.md,
-    paddingVertical: 8, marginBottom: 10, gap: 6,
-  },
-  backBarArrow: { fontSize: 22, color: colors.primary, fontWeight: '700', lineHeight: 26 },
-  backBarText: { ...typography.titleSmall, color: colors.primary, flex: 1 },
-
-  uplineCard: {
-    backgroundColor: colors.primaryContainer, borderRadius: radius.lg,
-    padding: spacing.lg, borderLeftWidth: 4, borderLeftColor: colors.primary, marginBottom: 12,
-  },
-  uplineCardActive: { backgroundColor: colors.primary + '22', borderLeftColor: colors.primaryDark },
-  uplineLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  rootBadge: {
-    backgroundColor: colors.primary, borderRadius: radius.full,
-    width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
-  },
-  rootBadgeText: { ...typography.titleSmall, color: colors.white },
-  uplineLabel: { ...typography.labelMedium, color: colors.primaryDark, marginBottom: 8 },
-  uplineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  uplineAvatar: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  uplineAvatarText: { ...typography.titleLarge, color: colors.white },
-  uplineName: { ...typography.titleSmall, color: colors.onPrimaryContainer },
-  uplineId: { ...typography.bodySmall, color: colors.primaryDark, marginTop: 2 },
-  downlineCount: { ...typography.bodySmall, color: colors.primaryDark, marginTop: 8 },
-  callBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.full,
-    width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
-  },
-  callBtnText: { fontSize: 18 },
-
-  summaryRow: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    flexDirection: 'row', padding: spacing.md, marginBottom: 12, ...elevation.level1,
-  },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryVal: { ...typography.headlineSmall, color: colors.primary },
-  summaryLabel: { ...typography.labelSmall, color: colors.onSurfaceMuted, marginTop: 2 },
-  summaryDiv: { width: 1, backgroundColor: colors.divider },
-
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface, borderRadius: radius.md,
-    borderWidth: 1.5, borderColor: colors.outline,
-    paddingHorizontal: spacing.md, height: 48, marginBottom: 12,
-  },
-  searchBoxFocused: { borderColor: colors.primary },
-  searchIcon: { fontSize: 16, marginRight: 8 },
-  searchInput: { flex: 1, ...typography.bodyLarge, color: colors.onSurface },
-  clearBtn: { fontSize: 13, color: colors.onSurfaceMuted, padding: 4 },
-
-  searchResultsCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: spacing.lg, marginBottom: 12, ...elevation.level1,
-  },
-  searchResultsTitle: { ...typography.titleSmall, color: colors.primary, marginBottom: 10 },
-  noResultText: { ...typography.bodyMedium, color: colors.onSurfaceMuted, textAlign: 'center', paddingVertical: 16 },
-  searchResultRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  srAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  srAvatarText: { fontSize: 20, fontWeight: '700' },
-  srInfo: { flex: 1 },
-  srName: { ...typography.titleSmall, color: colors.onSurface },
-  srPhone: { ...typography.titleSmall, color: colors.primary, marginTop: 2 },
-  srMeta: { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 1 },
-  srRight: { alignItems: 'flex-end', gap: 6 },
-  srCallBtn: { backgroundColor: colors.successContainer, borderRadius: radius.full, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  srCallIcon: { fontSize: 16 },
-
-  tableCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    overflow: 'hidden', marginBottom: 12, ...elevation.level1,
-  },
-  tableHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.primaryContainer, paddingHorizontal: spacing.lg, paddingVertical: 10,
-  },
-  th: { ...typography.labelSmall, color: colors.primaryDark, fontWeight: '700' },
-  tableRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: spacing.lg, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: colors.divider, minHeight: 56,
-  },
-  tableRowAlt: { backgroundColor: colors.background },
-  levelBadge: { borderRadius: radius.full, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
-  levelBadgeText: { ...typography.titleSmall, fontWeight: '800' },
-  countText: { ...typography.headlineSmall, fontWeight: '800' },
-  memberChips: { flex: 1, paddingHorizontal: 4 },
-  nameChip: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5,
-    marginRight: 6, maxWidth: 110,
-  },
-  nameChipClickable: { borderWidth: 1, borderColor: 'transparent' },
-  nameChipText: { ...typography.labelMedium, fontSize: 11 },
-  nameChipArrow: { fontSize: 14, fontWeight: '700', marginLeft: 2 },
-  emptyTable: { alignItems: 'center', paddingVertical: 28 },
-  emptyTableIcon: { fontSize: 32, marginBottom: 6 },
-  emptyTableText: { ...typography.bodyMedium, color: colors.onSurfaceMuted },
+  container:         { flex: 1, backgroundColor: colors.background },
+  scroll:            { padding: spacing.lg },
+  viewToggle:        { flexDirection: 'row', backgroundColor: colors.surfaceVariant, borderRadius: radius.lg, padding: 3, marginBottom: 14, gap: 3 },
+  viewBtn:           { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: radius.md },
+  viewBtnActive:     { backgroundColor: BRAND },
+  viewBtnTxt:        { ...typography.labelMedium, color: colors.onSurfaceMuted },
+  viewBtnTxtActive:  { color: colors.white, fontWeight: '700' },
+  searchBox:         { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.outline, height: 44, marginBottom: 10, ...elevation.level1 },
+  searchInput:       { flex: 1, paddingHorizontal: 8, ...typography.bodyMedium, color: colors.onSurface },
+  loaderBox:         { alignItems: 'center', paddingVertical: 48 },
+  errorBox:          { alignItems: 'center', paddingVertical: 40 },
+  errorTxt:          { ...typography.bodyMedium, color: colors.error, textAlign: 'center', marginBottom: 16 },
+  retryBtn:          { backgroundColor: colors.primaryContainer, borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 10 },
+  retryTxt:          { ...typography.titleSmall, color: colors.primary },
+  searchResultsTitle:{ ...typography.titleSmall, color: BRAND, marginBottom: 10 },
+  noResults:         { ...typography.bodyMedium, color: colors.onSurfaceMuted, textAlign: 'center', paddingVertical: 24 },
 });

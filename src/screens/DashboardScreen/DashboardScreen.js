@@ -60,10 +60,15 @@ const mr = StyleSheet.create({
 });
 
 // Card wrapper
-function MetricCard({ title, children }) {
+function MetricCard({ iconName, title, children }) {
   return (
     <View style={mc.card}>
-      <Text style={mc.title}>{title}</Text>
+      <View style={mc.header}>
+        <View style={mc.iconBox}>
+          <Icon name={iconName} size={16} color={colors.primary} />
+        </View>
+        <Text style={mc.title}>{title}</Text>
+      </View>
       <View style={mc.divider} />
       {children}
     </View>
@@ -71,7 +76,9 @@ function MetricCard({ title, children }) {
 }
 const mc = StyleSheet.create({
   card:    { flex: 1, minWidth: '47%', backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 10, ...elevation.level1 },
-  title:   { ...typography.titleSmall, color: colors.primary, fontWeight: '700', marginBottom: 8 },
+  header:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  iconBox: { width: 24, height: 24, borderRadius: 6, backgroundColor: colors.primaryContainer, alignItems: 'center', justifyContent: 'center' },
+  title:   { ...typography.titleSmall, color: colors.primary, fontWeight: '700' },
   divider: { height: 1, backgroundColor: colors.outlineVariant, marginBottom: 8 },
 });
 
@@ -80,7 +87,7 @@ function TeamCard({ team }) {
   const direct   = team?.directMembers  ?? 0;
   const downline = team?.totalDownline  ?? 0;
   return (
-    <MetricCard title="👥 Team">
+    <MetricCard iconName={Icons.team} title="Team">
       <View style={tc.center}>
         <Text style={tc.big}>{num(direct + downline)}</Text>
         <Text style={tc.sub}>Total Team</Text>
@@ -116,7 +123,7 @@ function BusinessCard({ business }) {
   const team   = business?.team   ?? {};
   const total  = business?.total  ?? {};
   return (
-    <MetricCard title="💼 Business">
+    <MetricCard iconName={Icons.sale} title="Business">
       <View style={bc.row}>
         <Text style={bc.hdr}>Type</Text>
         <Text style={bc.hdrR}>Orders</Text>
@@ -161,7 +168,7 @@ function CommissionCard({ commission }) {
   const reversal = commission?.totalReversal    ?? 0;
   const total    = commission?.totalCommission  ?? 0;
   return (
-    <MetricCard title="⭐ Commission">
+    <MetricCard iconName={Icons.commission} title="Commission">
       <MetricRow dot="#3b82f6" label="Direct"       value={rs(direct)}   />
       <MetricRow dot="#f59e0b" label="Team"         value={rs(team)}     />
       <MetricRow dot="#10b981" label="Total Credit" value={rs(credit)}   />
@@ -179,7 +186,7 @@ function PayoutCard({ payout }) {
   const pending    = payout?.totalPending         ?? 0;
   const unpaid     = payout?.unpaidCommission     ?? 0;
   return (
-    <MetricCard title="💳 Payout">
+    <MetricCard iconName={Icons.payout} title="Payout">
       <MetricRow dot="#6366f1" label="Generated" value={rs(generated)} />
       <MetricRow dot="#10b981" label="Paid"      value={rs(paid)}      />
       <MetricRow dot="#f59e0b" label="Pending"   value={rs(pending)}   />
@@ -212,7 +219,10 @@ function MilestoneSection({ milestone }) {
   return (
     <View style={ms.card}>
       <View style={ms.header}>
-        <Text style={ms.title}>🏆 Milestone Progress</Text>
+        <View style={ms.titleRow}>
+          <Icon name={Icons.trophy} size={18} color={colors.primary} />
+          <Text style={ms.title}>Milestone Progress</Text>
+        </View>
         <View style={[ms.badge, { backgroundColor: isQualified ? '#dcfce7' : '#fef9c3' }]}>
           <Text style={[ms.badgeText, { color: isQualified ? '#166534' : '#713f12' }]}>
             {isQualified ? `${achieved}/${total} achieved` : `Not qualified — ${achieved}/${total}`}
@@ -251,6 +261,7 @@ function MilestoneSection({ milestone }) {
 const ms = StyleSheet.create({
   card:        { backgroundColor: '#f7f5ef', borderRadius: 14, padding: 16, marginBottom: 10, ...elevation.level1 },
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 6 },
+  titleRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title:       { ...typography.titleMedium, color: colors.onSurface },
   badge:       { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
   badgeText:   { fontSize: 11, fontWeight: '600' },
@@ -276,7 +287,10 @@ function CommissionFlowSection({ slabs }) {
   if (!slabs || slabs.length === 0) return null;
   return (
     <View style={cf.card}>
-      <Text style={cf.title}>How ₹100 flows on your sale</Text>
+      <View style={cf.titleRow}>
+        <Icon name={Icons.commission} size={18} color={colors.primary} />
+        <Text style={cf.title}>How ₹100 flows on your sale</Text>
+      </View>
       {slabs.map((s, i) => (
         <View key={i} style={cf.row}>
           <View style={[cf.dot, { backgroundColor: s.color ?? SLAB_COLORS[i] ?? '#9ca3af' }]} />
@@ -292,7 +306,8 @@ function CommissionFlowSection({ slabs }) {
 }
 const cf = StyleSheet.create({
   card:    { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 10, ...elevation.level1 },
-  title:   { ...typography.titleMedium, color: colors.onSurface, marginBottom: 14 },
+  titleRow:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+  title:   { ...typography.titleMedium, color: colors.onSurface },
   row:     { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   dot:     { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   label:   { width: 120, ...typography.bodySmall, color: colors.onSurfaceMuted },

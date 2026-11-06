@@ -1,6 +1,6 @@
 // ── Shared MLM Level Constants ────────────────────────────
 // Single source of truth — TeamScreen, BusinessPayoutScreen,
-// CommissionScreen etc. sab yahan se import karein.
+// CommissionScreen etc. all import from here.
 
 export const LEVEL_LABELS = {
   1: 'B', 2: 'C', 3: 'D', 4: 'E',
