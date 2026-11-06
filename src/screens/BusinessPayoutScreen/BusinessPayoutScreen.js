@@ -157,21 +157,29 @@ export default function BusinessPayoutScreen() {
       ]);
       if (bizRes.success) setTeamBusiness(bizRes.data);
       if (payRes.success) {
-        const normalized = (payRes.data?.payouts || payRes.data || []).map(p => ({
+        const raw = payRes.data?.payouts || payRes.data || [];
+        const normalized = raw.map(p => ({
           ...p,
-          id: p._id,
-          cycleStart: p.cycleStart || (p.periodFrom ? new Date(p.periodFrom).toLocaleDateString('en-IN') : ''),
-          cycleEnd: p.cycleEnd || (p.periodTo ? new Date(p.periodTo).toLocaleDateString('en-IN') : ''),
-          totalBusiness: p.totalBusiness || 0,
-          commissionEarned: p.commissionEarned || p.totalCommission || 0,
-          netAmount: p.netAmount || p.payableAmount || null,
-          tds: p.tds || null,
-          status: p.status || 'Pending',
-          levelBreakup: p.levelBreakup || p.levelWise || [],
-          referenceNo: p.referenceNo || p.transactionId || null,
-          bankName: p.bankName || '',
-          accountLast4: p.accountLast4 || '',
-          processedDate: p.processedDate || (p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN') : null),
+          id:               p._id || p.batchId,
+          cycleStart:       p.periodStart ? new Date(p.periodStart).toLocaleDateString('en-IN') : (p.periodKey?.split('_')[0] || ''),
+          cycleEnd:         p.periodEnd   ? new Date(p.periodEnd).toLocaleDateString('en-IN')   : (p.periodKey?.split('_')[1] || ''),
+          totalBusiness:    p.totalBusinessAmount || 0,
+          commissionEarned: p.totalCommission || 0,
+          directCommission: p.directCommission || 0,
+          teamCommission:   p.teamCommission || 0,
+          netAmount:        p.grandTotal || null,
+          tds:              null,
+          status:           p.status || 'Pending',
+          levelBreakup:     p.levelBreakup || [],
+          referenceNo:      p.paymentReference || null,
+          bankName:         '',
+          accountLast4:     '',
+          processedDate:    p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN') : null,
+          periodKey:        p.periodKey || '',
+          milestoneReward:  p.milestoneReward || 0,
+          totalUnitSale:    p.totalUnitSale || 0,
+          totalCredit:      p.totalCredit || 0,
+          totalReversal:    p.totalReversal || 0,
         }));
         setPayouts(normalized);
       }
@@ -197,11 +205,21 @@ export default function BusinessPayoutScreen() {
   };
 
   const totalPaid   = payouts.filter(p => p.status === 'Paid').reduce((a, p) => a + (p.netAmount || 0), 0);
-  const pendingComm = (commSummary?.commissions || []).filter(c => c.status === 'Pending').reduce((a, c) => a + (c.amount || 0), 0);
+  const totalPending = payouts.filter(p => p.status === 'Pending').reduce((a, p) => a + (p.netAmount || p.commissionEarned || 0), 0);
 
-  const selfBusiness    = teamBusiness?.selfBusiness || 0;
-  const totalGroupBusiness = teamBusiness?.groupBusiness || teamBusiness?.totalGroupBusiness || 0;
-  const totalBusiness   = selfBusiness + totalGroupBusiness;
+  const selfBusiness       = teamBusiness?.selfBusiness || teamBusiness?.directBusiness || 0;
+  const totalGroupBusiness = teamBusiness?.groupBusiness || teamBusiness?.teamBusiness || teamBusiness?.totalGroupBusiness || 0;
+  const totalBusiness      = teamBusiness?.totalBusiness || (selfBusiness + totalGroupBusiness);
+
+  // From commission summary (commission/my/:id response)
+  const directComm  = commSummary?.commission?.directCommission ?? commSummary?.directCommission ?? 0;
+  const teamComm    = commSummary?.commission?.teamCommission   ?? commSummary?.teamCommission   ?? 0;
+  const totalComm   = commSummary?.commission?.totalCommission  ?? commSummary?.totalCommission  ?? 0;
+  const totalCredit = commSummary?.commission?.totalCredit      ?? commSummary?.totalCredit      ?? 0;
+  const totalRev    = commSummary?.commission?.totalReversal    ?? commSummary?.totalReversal    ?? 0;
+
+  // From payout summary returned alongside payouts
+  const payoutSummary = commSummary?.payoutSummary || {};
 
   return (
     <View style={s.container}>
@@ -278,20 +296,33 @@ export default function BusinessPayoutScreen() {
                   <Text style={s.cardTitle}>Commission Summary</Text>
                   <View style={s.commRow}>
                     {[
-                      { iconName: Icons.pending,  color: colors.pending,      val: pendingComm, label: 'Pending' },
-                      { iconName: Icons.eligible, color: colors.primaryLight, val: commSummary?.approvedCommission || 0, label: 'Approved' },
-                      { iconName: Icons.paid,     color: colors.success,      val: commSummary?.paidCommission || 0, label: 'Paid' },
+                      { iconName: Icons.commission, color: colors.primary,  val: directComm, label: 'Direct' },
+                      { iconName: Icons.team,       color: colors.success,  val: teamComm,   label: 'Team'   },
+                      { iconName: Icons.paid,       color: colors.pending,  val: totalComm,  label: 'Total'  },
                     ].map((item, i) => (
                       <React.Fragment key={item.label}>
                         {i > 0 && <View style={s.commDiv} />}
                         <View style={s.commItem}>
                           <Icon name={item.iconName} size={22} color={item.color} style={{ marginBottom: 4 }} />
-                          <Text style={[s.commVal, { color: item.color }]}>₹{item.val.toLocaleString()}</Text>
+                          <Text style={[s.commVal, { color: item.color }]}>₹{Number(item.val).toLocaleString('en-IN')}</Text>
                           <Text style={s.commLabel}>{item.label}</Text>
                         </View>
                       </React.Fragment>
                     ))}
                   </View>
+                  {(totalCredit > 0 || totalRev > 0) && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.divider }}>
+                      <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{ ...typography.labelSmall, color: colors.onSurfaceMuted }}>Total Credit</Text>
+                        <Text style={{ ...typography.titleSmall, color: colors.success, marginTop: 2 }}>₹{Number(totalCredit).toLocaleString('en-IN')}</Text>
+                      </View>
+                      <View style={{ width: 1, backgroundColor: colors.divider }} />
+                      <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{ ...typography.labelSmall, color: colors.onSurfaceMuted }}>Reversal</Text>
+                        <Text style={{ ...typography.titleSmall, color: colors.error, marginTop: 2 }}>-₹{Number(totalRev).toLocaleString('en-IN')}</Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
             </>
@@ -302,16 +333,12 @@ export default function BusinessPayoutScreen() {
               <View style={s.banner}>
                 <View style={s.bannerLeft}>
                   <Text style={s.bannerLabel}>Total Paid Out</Text>
-                  <Text style={s.bannerVal}>₹{totalPaid.toLocaleString()}</Text>
+                  <Text style={s.bannerVal}>₹{totalPaid.toLocaleString('en-IN')}</Text>
                 </View>
-                {payouts.find(p => p.status === 'Processing') && (
-                  <View style={s.bannerRight}>
-                    <Text style={s.bannerLabel}>Processing</Text>
-                    <Text style={[s.bannerValSm, { color: colors.warning }]}>
-                      ₹{(payouts.find(p => p.status === 'Processing').commissionEarned || 0).toLocaleString()}
-                    </Text>
-                  </View>
-                )}
+                <View style={s.bannerRight}>
+                  <Text style={s.bannerLabel}>Pending</Text>
+                  <Text style={[s.bannerValSm, { color: colors.warning }]}>₹{totalPending.toLocaleString('en-IN')}</Text>
+                </View>
               </View>
 
               {payouts.length === 0 ? (

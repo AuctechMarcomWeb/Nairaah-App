@@ -24,8 +24,7 @@ const NAV_ITEMS = [
   { label: 'Orders',            icon: 'receipt-outline',            screen: 'SalesHistory'   },
   { label: 'Team / Downline',   icon: 'account-group-outline',      screen: 'Team'           },
   { label: 'Earnings',          icon: 'cash-multiple',              screen: 'Commission'     },
-  { label: 'Business & Payout', icon: 'briefcase-outline',          screen: 'BusinessPayout' },
-  { label: 'Payout History',    icon: 'wallet-outline',             screen: 'Payout'         },
+  { label: 'My Commission',     icon: 'wallet-outline',             screen: 'Payout'         },
   { label: 'My Profile',        icon: 'account-circle-outline',     screen: 'Profile'        },
 ];
 
