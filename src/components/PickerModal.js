@@ -38,8 +38,8 @@ export function PickerModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <View style={s.overlay}>
-        <View style={s.sheet}>
+      <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={handleClose}>
+        <TouchableOpacity style={s.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={s.handle} />
 
           {/* Title */}
@@ -98,8 +98,8 @@ export function PickerModal({
           <TouchableOpacity style={s.cancelBtn} onPress={handleClose}>
             <Text style={s.cancelText}>Cancel</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }

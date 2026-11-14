@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity,
-  StatusBar, Alert, ActivityIndicator, Modal, KeyboardAvoidingView, Platform,
+  StatusBar, Alert, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
@@ -717,9 +717,17 @@ export default function CreateSaleScreen({ navigation, route }) {
           onClose={() => setShowProductPicker(false)}
           renderItem={(item, onSelect) => (
             <TouchableOpacity style={s.pickerRow} onPress={onSelect}>
-              <View style={[s.pickerAvatar, { backgroundColor: colors.surfaceVariant }]}>
-                <Icon name={Icons.product} size={22} color={colors.primary} />
-              </View>
+              {item.images?.[0] ? (
+                <Image
+                  source={{ uri: item.images[0] }}
+                  style={s.pickerProductImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[s.pickerAvatar, { backgroundColor: colors.surfaceVariant }]}>
+                  <Icon name={Icons.product} size={22} color={colors.primary} />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={s.pickerName}>{item.name}</Text>
                 <Text style={s.pickerSub}>
@@ -818,6 +826,7 @@ const s = StyleSheet.create({
   dueLabel:    { ...typography.bodySmall, color: colors.error, marginLeft: 'auto' },
   pickerRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: colors.divider },
   pickerAvatar:{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryContainer, alignItems: 'center', justifyContent: 'center' },
+  pickerProductImg: { width: 44, height: 44, borderRadius: 8, backgroundColor: colors.surfaceVariant },
   pickerName:  { ...typography.titleSmall, color: colors.onSurface },
   pickerSub:   { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 2 },
 });
