@@ -1,23 +1,33 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Modal,
-  TouchableWithoutFeedback,
+  Pressable,
   Dimensions,
   StyleSheet,
+  BackHandler,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDrawer } from './DrawerContext';
 import Sidebar from '../components/Sidebar';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const DRAWER_W = SCREEN_W * 0.82;
+const DRAWER_W = SCREEN_W * 0.75;
 
 export const DrawerOverlay = () => {
   const navigation = useNavigation();
   const { isOpen, closeDrawer } = useDrawer();
 
-  // Get current active route name safely — useRoute() crashes outside screen context
+  // Android back button closes drawer
+  useEffect(() => {
+    if (!isOpen) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeDrawer();
+      return true;
+    });
+    return () => sub.remove();
+  }, [isOpen, closeDrawer]);
+
   const getActiveRouteName = () => {
     try {
       const state = navigation.getState();
@@ -32,36 +42,36 @@ export const DrawerOverlay = () => {
     <Modal
       visible={isOpen}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={closeDrawer}
     >
-      {/* Overlay Background */}
-      <TouchableWithoutFeedback onPress={closeDrawer}>
-        <View style={styles.overlay} />
-      </TouchableWithoutFeedback>
+      {/* Full screen row: drawer on left, pressable dismiss area on right */}
+      <View style={styles.root}>
 
-      {/* Drawer Sidebar */}
-      <View style={styles.drawer}>
-        <Sidebar
-          closeDrawer={closeDrawer}
-          navigation={navigation}
-          activeRoute={getActiveRouteName()}
-        />
+        {/* Drawer panel */}
+        <View style={styles.drawer}>
+          <Sidebar
+            closeDrawer={closeDrawer}
+            navigation={navigation}
+            activeRoute={getActiveRouteName()}
+          />
+        </View>
+
+        {/* Tap this area to close */}
+        <Pressable style={styles.dismissArea} onPress={closeDrawer} />
+
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  root: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   drawer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
     width: DRAWER_W,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
@@ -69,5 +79,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 20,
+  },
+  dismissArea: {
+    flex: 1,
   },
 });

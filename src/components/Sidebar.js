@@ -156,22 +156,22 @@ export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashbo
           </View>
         </View>
 
-        {/* Stats row — placeholder, replaced with real data from dashboard */}
+        {/* Stats row — tappable shortcuts */}
         <View style={s.statsRow}>
-          <View style={s.statItem}>
+          <TouchableOpacity style={s.statItem} onPress={() => goTo('BusinessPayout')} activeOpacity={0.7}>
             <Icon name="briefcase-outline" size={20} color="rgba(255,255,255,0.7)" />
             <Text style={s.statLab}>Business</Text>
-          </View>
+          </TouchableOpacity>
           <View style={s.statDivider} />
-          <View style={s.statItem}>
+          <TouchableOpacity style={s.statItem} onPress={() => goTo('Commission')} activeOpacity={0.7}>
             <Icon name="cash-multiple" size={20} color="rgba(255,255,255,0.7)" />
             <Text style={s.statLab}>Commission</Text>
-          </View>
+          </TouchableOpacity>
           <View style={s.statDivider} />
-          <View style={s.statItem}>
+          <TouchableOpacity style={s.statItem} onPress={() => goTo('Commission')} activeOpacity={0.7}>
             <Icon name="medal-outline" size={20} color="rgba(255,255,255,0.7)" />
             <Text style={s.statLab}>{displayLevel || 'My Level'}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 

@@ -205,11 +205,11 @@ function MilestoneSection({ milestone }) {
   const achieved           = summary.achieved ?? milestones.filter(m => m.isAchieved).length;
   const currentMs          = milestones.find(m => !m.isAchieved) ?? milestones[milestones.length - 1];
   const eligibleUnits      = currentMs?.eligibleUnits   ?? 0;
-  const targetUnit         = currentMs?.targetUnit      ?? 100000;
+  const targetUnit         = currentMs?.targetUnit      ?? 0;
   const unitsRemaining     = currentMs?.unitsRemaining  ?? 0;
   const directCount        = currentMs?.directTeamCount ?? 0;
-  const requiredDirects    = currentMs?.requiredDirects ?? 10;
-  const capPerLeg          = currentMs?.capPerLeg       ?? 1000;
+  const requiredDirects    = currentMs?.requiredDirects ?? 0;
+  const capPerLeg          = currentMs?.capPerLeg       ?? 0;
   const nextReward         = currentMs?.rewardAmount    ?? 0;
   const nextTitle          = currentMs?.title           ?? '';
   const isQualified        = achieved > 0;
@@ -492,14 +492,22 @@ export default function DashboardScreen({ navigation }) {
 
             {/* ── Row 1: Team + Business ─────────────────────────────────── */}
             <View style={styles.cardRow}>
-              <TeamCard     team={team} />
-              <BusinessCard business={business} />
+              <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.85} onPress={() => navigation.navigate('Team')}>
+                <TeamCard team={team} />
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.85} onPress={() => navigation.navigate('BusinessPayout')}>
+                <BusinessCard business={business} />
+              </TouchableOpacity>
             </View>
 
             {/* ── Row 2: Commission + Payout ────────────────────────────── */}
             <View style={styles.cardRow}>
-              <CommissionCard commission={commission} />
-              <PayoutCard     payout={payout} />
+              <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.85} onPress={() => navigation.navigate('Commission')}>
+                <CommissionCard commission={commission} />
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.85} onPress={() => navigation.navigate('Payout')}>
+                <PayoutCard payout={payout} />
+              </TouchableOpacity>
             </View>
 
             {/* ── Milestone Progress ────────────────────────────────────── */}
