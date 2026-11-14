@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity,
   StatusBar, Alert, ActivityIndicator, Modal, FlatList, RefreshControl,
@@ -601,6 +601,7 @@ export default function AddMemberScreen({ navigation }) {
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="Add Distributor / Customer"
+        onBack={() => navigation.goBack()}
         subtitle={`${users.length} members`}
         rightIconName="account-plus"
         onRightPress={() => setShowAddModal(true)}

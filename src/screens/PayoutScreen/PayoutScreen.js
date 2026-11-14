@@ -239,7 +239,7 @@ const sum = StyleSheet.create({
 });
 
 // ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
-export default function PayoutScreen() {
+export default function PayoutScreen({ navigation }) {
   const { user }     = useSelector(state => state.user);
   const [payouts,  setPayouts]  = useState([]);
   const [summary,  setSummary]  = useState(null);
@@ -274,7 +274,7 @@ export default function PayoutScreen() {
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
-      <AppHeader title="My Commission" subtitle={`${payouts.length} payout cycles`} />
+      <AppHeader title="My Commission" subtitle={`${payouts.length} payout cycles`} onBack={() => navigation.goBack()} />
 
       {loading ? (
         <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />

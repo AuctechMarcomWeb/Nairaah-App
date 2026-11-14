@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TeamScreen — My Distributor Network
  * Mirrors MLM-Admin → /distributor/downline-tree
  * 3 view modes: Tree | Levels | Table
@@ -651,6 +651,7 @@ export default function TeamScreen({ navigation }) {
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="My Network"
+        onBack={() => navigation.goBack()}
         subtitle={`${totalTeam} total · ${directTeam} direct`}
         rightIconName="account-plus"
         onRightPress={() => navigation.navigate('AddMember')}

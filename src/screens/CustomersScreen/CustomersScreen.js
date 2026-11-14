@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, Alert, Modal, ActivityIndicator, RefreshControl,
@@ -226,6 +226,7 @@ export default function CustomersScreen({ navigation }) {
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="My Customers"
+        onBack={() => navigation.goBack()}
         subtitle={`${customers.length} customers`}
         rightIcon="➕"
         onRightPress={() => navigation.navigate('AddMember')}

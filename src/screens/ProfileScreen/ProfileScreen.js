@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, StatusBar, Alert, ActivityIndicator,
@@ -107,6 +107,7 @@ export default function ProfileScreen({ navigation }) {
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="My Profile"
+        onBack={() => navigation.goBack()}
         subtitle={displayId}
         rightIconName={editMode ? null : Icons.edit}
         onRightPress={() => setEditMode(true)}

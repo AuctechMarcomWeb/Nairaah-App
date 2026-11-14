@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CommissionScreen — Distributor Earnings + Downline (merged)
  * Mirrors MLM-Admin → /distributor/earnings
  *
@@ -763,6 +763,7 @@ export default function CommissionScreen({ navigation }) {
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="Distributor Earnings"
+        onBack={() => navigation.goBack()}
         subtitle={`${totalMembers} members · ${activeCount} active`}
       />
 

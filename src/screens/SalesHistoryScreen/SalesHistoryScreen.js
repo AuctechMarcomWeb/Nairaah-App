@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
@@ -545,6 +545,7 @@ export default function SalesHistoryScreen({ navigation }) {
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="Orders"
+        onBack={() => navigation.goBack()}
         subtitle={`${total} orders`}
         rightIconName="plus"
         onRightPress={() => navigation.navigate('CreateSale')}

@@ -130,7 +130,7 @@ const dm = StyleSheet.create({
 });
 
 // ── Main Screen ───────────────────────────────────────────
-export default function BusinessPayoutScreen() {
+export default function BusinessPayoutScreen({ navigation }) {
   const { user } = useSelector(state => state.user);
   const [activeTab, setActiveTab] = useState('business');
   const [selectedPayout, setSelectedPayout] = useState(null);
@@ -224,7 +224,7 @@ export default function BusinessPayoutScreen() {
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
-      <AppHeader title="Business & Payout" subtitle="Commission summary" />
+      <AppHeader title="Business & Payout" subtitle="Commission summary" onBack={() => navigation.goBack()} />
 
       {/* Tab Toggle */}
       <View style={s.tabRow}>

@@ -258,7 +258,7 @@ export default function ProductsScreen({ navigation }) {
   return (
     <View style={s.container}>
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
-      <AppHeader title="Products" subtitle={`${productList.length} products`} />
+      <AppHeader title="Products" subtitle={`${productList.length} products`} onBack={() => navigation.goBack()} />
 
       <View style={s.body}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search products..." style={s.searchBox} />
