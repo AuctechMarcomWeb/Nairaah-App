@@ -363,7 +363,6 @@ function transformSlabs(slabs) {
         color:   SLAB_COLORS[idx] ?? '#9ca3af',
       };
     });
-  rows.push({ label: 'A+ / Leader', percent: 0.5, amount: 0.5, color: '#c8b400' });
   return rows;
 }
 

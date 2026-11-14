@@ -36,8 +36,8 @@ export default function LoginScreen({ navigation }) {
   const dispatch = useDispatch();
   const { loading, error: reduxError } = useSelector(state => state.user);
 
-  const [userId, setUserId] = useState('Admin');
-  const [password, setPassword] = useState('Admin@123');
+  const [userId, setUserId] = useState('');
+  const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 

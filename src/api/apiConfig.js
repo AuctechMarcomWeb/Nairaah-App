@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Current machine IP: 192.168.1.24  |  Backend port: 5002
 //
 // const BASE_URL = 'https://api.nairaah.in/api';   // ← production
-const BASE_URL = 'http://192.168.1.24:5002/api';    // ← local dev
+const BASE_URL = 'https://api.nairaah.in/api';    // ← production
 
 let _cachedToken = null;
 

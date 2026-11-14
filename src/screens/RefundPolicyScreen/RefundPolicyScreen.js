@@ -11,7 +11,7 @@ const REFUND_POLICY_ID = '6a7434eb52886ea51a838741';
 
 export default function RefundPolicyScreen({ navigation }) {
   const [loading,  setLoading]  = useState(true);
-  const [title,    setTitle]    = useState('Refund & Buy-Back Policy');
+  const [title,    setTitle]    = useState('');
   const [content,  setContent]  = useState('');
   const [error,    setError]    = useState(false);
 

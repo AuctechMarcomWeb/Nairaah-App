@@ -614,12 +614,9 @@ export default function TeamScreen({ navigation }) {
 
   const onRefresh = async () => { setRefreshing(true); await fetchTeam(); setRefreshing(false); };
 
-  const currentView   = viewStack[viewStack.length - 1] || { root: null, members: [] };
+  const currentView    = viewStack[viewStack.length - 1] || { root: null, members: [] };
   const currentMembers = currentView.members || [];
-  const allFlat        = flattenAll(currentMembers, 1);
   const globalFlat     = flattenAll(rootMembers, 1);
-  const totalMembers   = globalFlat.length;
-  const activeMembers  = globalFlat.filter(m => m.isActive !== false && m.distributorStatus !== 'Inactive').length;
   const isRoot         = viewStack.length <= 1;
 
   const searchResults = search.trim().length > 1
@@ -654,7 +651,7 @@ export default function TeamScreen({ navigation }) {
       <StatusBar backgroundColor={colors.surface} barStyle="dark-content" />
       <AppHeader
         title="My Network"
-        subtitle={`${totalMembers} total · ${activeMembers} active`}
+        subtitle={`${totalTeam} total · ${directTeam} direct`}
         rightIconName="account-plus"
         onRightPress={() => navigation.navigate('AddMember')}
       />

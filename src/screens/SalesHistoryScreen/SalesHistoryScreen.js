@@ -46,6 +46,10 @@ const fmtDate = (v) => v ? new Date(v).toLocaleDateString('en-IN') : '—';
 const fmtMoney = (v) => `₹${(Number(v) || 0).toLocaleString('en-IN')}`;
 
 const isWithin48h = (order) => {
+  // isCancellable flag API se aata hai — agar available ho toh woh use karo
+  if (order?.isCancellable === true)  return true;
+  if (order?.isCancellable === false) return false;
+  // fallback: API field na ho toh orderDate se check
   const placed = order?.orderDate || order?.createdAt;
   if (!placed) return false;
   return Date.now() - new Date(placed).getTime() <= 48 * 60 * 60 * 1000;
