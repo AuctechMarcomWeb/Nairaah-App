@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl,
+  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider, SearchBar } from '../../components';
@@ -10,34 +10,29 @@ import { getAllProducts } from '../../api/products';
 const categories = ['All', 'Health', 'Beauty', 'Nutrition'];
 
 function ProductCard({ item, onPress }) {
-  const discount = Math.round(((item.mrp - item.sellingPrice) / item.mrp) * 100);
+  const imageUrl = item.images?.[0] || null;
   return (
     <TouchableOpacity style={pc.card} onPress={onPress} activeOpacity={0.8}>
       <View style={pc.imageBox}>
-        <Text style={pc.imageIcon}>
-          {item.category === 'Health' ? '💊' : item.category === 'Beauty' ? '✨' : '🥤'}
-        </Text>
-        {!item.inStock && (
-          <View style={pc.outOverlay}>
-            <Text style={pc.outText}>Out of Stock</Text>
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={pc.image} resizeMode="cover" />
+        ) : (
+          <View style={pc.imagePlaceholder}>
+            <Text style={pc.imageIcon}>📦</Text>
           </View>
         )}
-        {discount > 0 && item.inStock && (
-          <View style={pc.discountBadge}>
-            <Text style={pc.discountText}>{discount}% OFF</Text>
+        {!item.isActive && (
+          <View style={pc.outOverlay}>
+            <Text style={pc.outText}>Inactive</Text>
           </View>
         )}
       </View>
       <View style={pc.info}>
-        <Text style={pc.category}>{item.category}</Text>
-        <Text style={pc.name}>{item.name}</Text>
-        <Text style={pc.desc} numberOfLines={1}>{item.description}</Text>
-        <View style={pc.priceRow}>
-          <Text style={pc.mrp}>MRP ₹{item.mrp.toLocaleString()}</Text>
-          <Text style={pc.price}>₹{item.sellingPrice.toLocaleString()}</Text>
-          <Text style={pc.unit}>/ {item.unit}</Text>
-        </View>
-        <StatusChip status={item.inStock ? 'Active' : 'Inactive'} />
+        <Text style={pc.name} numberOfLines={2}>{item.name}</Text>
+        <Text style={pc.desc} numberOfLines={2}>{item.description}</Text>
+        {item.mrp > 0 && (
+          <Text style={pc.price}>₹{item.mrp.toLocaleString()}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -47,24 +42,26 @@ const pc = StyleSheet.create({
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     flexDirection: 'row', marginBottom: 10, overflow: 'hidden',
+    height: 100,
     ...elevation.level1,
   },
   imageBox: {
-    width: 90, backgroundColor: colors.surfaceVariant,
-    alignItems: 'center', justifyContent: 'center', position: 'relative',
+    width: 100,
+    backgroundColor: colors.surfaceVariant,
+    position: 'relative',
   },
-  imageIcon: { fontSize: 38 },
+  image: { width: 100, height: 100 },
+  imagePlaceholder: {
+    width: 100, height: 100,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surfaceVariant,
+  },
+  imageIcon: { fontSize: 32 },
   outOverlay: {
     ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center',
   },
   outText: { color: colors.white, ...typography.labelMedium },
-  discountBadge: {
-    position: 'absolute', top: 6, left: 0,
-    backgroundColor: colors.error, paddingHorizontal: 6, paddingVertical: 2,
-    borderTopRightRadius: 6, borderBottomRightRadius: 6,
-  },
-  discountText: { ...typography.labelSmall, color: colors.white },
   info: { flex: 1, padding: spacing.md },
   category: { ...typography.labelSmall, color: colors.primaryLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
   name: { ...typography.titleSmall, color: colors.onSurface },
@@ -77,66 +74,48 @@ const pc = StyleSheet.create({
 
 function DetailModal({ visible, product, onClose, onCreateSale }) {
   if (!product) return null;
-  const discount = Math.round(((product.mrp - product.sellingPrice) / product.mrp) * 100);
+  const imageUrl = product.images?.[0] || null;
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={dm.overlay}>
         <View style={dm.sheet}>
           <View style={dm.handle} />
           <View style={dm.imageArea}>
-            <Text style={dm.bigIcon}>
-              {product.category === 'Health' ? '💊' : product.category === 'Beauty' ? '✨' : '🥤'}
-            </Text>
-            {discount > 0 && (
-              <View style={dm.discountBig}>
-                <Text style={dm.discountBigText}>{discount}% OFF</Text>
-              </View>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={dm.image} resizeMode="contain" />
+            ) : (
+              <Text style={dm.bigIcon}>📦</Text>
             )}
           </View>
 
-          <Text style={dm.category}>{product.category}</Text>
           <Text style={dm.name}>{product.name}</Text>
           <Text style={dm.desc}>{product.description}</Text>
 
           <Divider style={{ marginVertical: 14 }} />
 
-          <View style={dm.priceRow}>
-            <View style={dm.priceItem}>
-              <Text style={dm.priceLabel}>MRP</Text>
-              <Text style={dm.priceValMRP}>₹{product.mrp.toLocaleString()}</Text>
+          {product.mrp > 0 && (
+            <View style={dm.priceRow}>
+              <View style={dm.priceItem}>
+                <Text style={dm.priceLabel}>Price</Text>
+                <Text style={dm.priceVal}>₹{product.mrp.toLocaleString()}</Text>
+              </View>
             </View>
-            <View style={dm.priceDivider} />
-            <View style={dm.priceItem}>
-              <Text style={dm.priceLabel}>Selling Price</Text>
-              <Text style={dm.priceVal}>₹{product.sellingPrice.toLocaleString()}</Text>
-            </View>
-            <View style={dm.priceDivider} />
-            <View style={dm.priceItem}>
-              <Text style={dm.priceLabel}>Saving</Text>
-              <Text style={[dm.priceVal, { color: colors.success }]}>
-                ₹{(product.mrp - product.sellingPrice).toLocaleString()}
-              </Text>
-            </View>
-          </View>
+          )}
 
           <Divider style={{ marginVertical: 14 }} />
 
           <View style={dm.metaRow}>
-            <Text style={dm.metaLabel}>Product ID</Text>
-            <Text style={dm.metaVal}>{product.id}</Text>
-          </View>
-          <View style={dm.metaRow}>
-            <Text style={dm.metaLabel}>Unit</Text>
-            <Text style={dm.metaVal}>Per {product.unit}</Text>
+            <Text style={dm.metaLabel}>Product Code</Text>
+            <Text style={dm.metaVal}>{product.productCode || product.id}</Text>
           </View>
           <View style={dm.metaRow}>
             <Text style={dm.metaLabel}>Status</Text>
-            <StatusChip status={product.inStock ? 'Active' : 'Inactive'} />
+            <StatusChip status={product.isActive ? 'Active' : 'Inactive'} />
           </View>
 
           <Divider style={{ marginVertical: 14 }} />
 
-          {product.inStock && (
+          {product.isActive && (
             <TouchableOpacity
               style={dm.saleBtn}
               onPress={() => { onClose(); onCreateSale(product); }}>
@@ -163,15 +142,11 @@ const dm = StyleSheet.create({
   imageArea: {
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.surfaceVariant,
-    borderRadius: radius.lg, height: 100, marginBottom: 14, position: 'relative',
+    borderRadius: radius.lg, height: 160, marginBottom: 14, position: 'relative',
+    overflow: 'hidden',
   },
+  image: { width: '100%', height: '100%', borderRadius: radius.lg },
   bigIcon: { fontSize: 52 },
-  discountBig: {
-    position: 'absolute', top: 8, right: 8,
-    backgroundColor: colors.error, borderRadius: radius.sm,
-    paddingHorizontal: 8, paddingVertical: 3,
-  },
-  discountBigText: { ...typography.labelSmall, color: colors.white },
   category: { ...typography.labelMedium, color: colors.primaryLight, textTransform: 'uppercase', letterSpacing: 0.5 },
   name: { ...typography.headlineMedium, color: colors.onSurface, marginTop: 2 },
   desc: { ...typography.bodyMedium, color: colors.onSurfaceMuted, marginTop: 4, lineHeight: 20 },
@@ -180,7 +155,6 @@ const dm = StyleSheet.create({
   priceItem: { flex: 1, alignItems: 'center' },
   priceDivider: { width: 1, backgroundColor: colors.divider },
   priceLabel: { ...typography.labelSmall, color: colors.onSurfaceMuted },
-  priceValMRP: { ...typography.titleSmall, color: colors.onSurfaceMuted, textDecorationLine: 'line-through', marginTop: 4 },
   priceVal: { ...typography.titleSmall, color: colors.primary, marginTop: 4 },
 
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7 },
@@ -218,12 +192,10 @@ export default function ProductsScreen({ navigation }) {
           ...p,
           id: p._id,
           name: p.name || p.productName || '',
-          category: p.category?.name || p.categoryName || p.category || 'General',
-          description: p.description || p.desc || '',
-          mrp: p.mrp || p.MRP || 0,
-          sellingPrice: p.sellingPrice || p.price || p.distributorPrice || 0,
-          unit: p.unit || p.unitType || 'pc',
-          inStock: p.inStock ?? (p.stock > 0) ?? true,
+          category: p.categoryData?.name || p.category?.name || p.categoryName || p.category || 'General',
+          description: p.description || p.shortDescription || p.desc || '',
+          mrp: p.mrp || 0,
+          images: p.images || [],
         }));
         setProductList(list);
         // Auto-build category filter from products
