@@ -84,37 +84,37 @@ const mc = StyleSheet.create({
 
 // Team card
 function TeamCard({ team }) {
-  const direct   = team?.directMembers  ?? 0;
-  const downline = team?.totalDownline  ?? 0;
+  const direct   = team?.directMembers ?? 0;
+  const downline = team?.totalDownline ?? 0;
   return (
     <MetricCard iconName={Icons.team} title="Team">
-      <View style={tc.center}>
-        <Text style={tc.big}>{num(direct + downline)}</Text>
-        <Text style={tc.sub}>Total Team</Text>
-      </View>
       <View style={tc.row}>
         <View style={tc.cell}>
-          <Text style={[tc.cellVal, { color: '#2563eb' }]}>{num(direct)}</Text>
-          <Text style={tc.cellLbl}>Direct</Text>
+          <View style={[tc.iconBox, { backgroundColor: '#eff6ff' }]}>
+            <Icon name={Icons.personal} size={16} color="#2563eb" />
+          </View>
+          <Text style={[tc.val, { color: '#2563eb' }]}>{num(direct)}</Text>
+          <Text style={tc.lbl}>Direct</Text>
         </View>
-        <View style={tc.sep} />
+        <View style={tc.divider} />
         <View style={tc.cell}>
-          <Text style={[tc.cellVal, { color: '#7c3aed' }]}>{num(downline)}</Text>
-          <Text style={tc.cellLbl}>Downline</Text>
+          <View style={[tc.iconBox, { backgroundColor: '#f5f3ff' }]}>
+            <Icon name={Icons.downline} size={16} color="#7c3aed" />
+          </View>
+          <Text style={[tc.val, { color: '#7c3aed' }]}>{num(downline)}</Text>
+          <Text style={tc.lbl}>Downline</Text>
         </View>
       </View>
     </MetricCard>
   );
 }
 const tc = StyleSheet.create({
-  center:  { alignItems: 'center', marginBottom: 10 },
-  big:     { fontSize: 28, fontWeight: '800', color: colors.primary },
-  sub:     { ...typography.bodySmall, color: colors.onSurfaceMuted },
-  row:     { flexDirection: 'row', justifyContent: 'space-around', marginTop: 4 },
-  cell:    { alignItems: 'center' },
-  sep:     { width: 1, backgroundColor: colors.outlineVariant },
-  cellVal: { fontSize: 18, fontWeight: '700' },
-  cellLbl: { ...typography.bodySmall, color: colors.onSurfaceMuted },
+  row:     { flexDirection: 'row', alignItems: 'center', paddingTop: 6 },
+  cell:    { flex: 1, alignItems: 'center', gap: 5 },
+  iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  val:     { fontSize: 22, fontWeight: '800', letterSpacing: 0.5 },
+  lbl:     { ...typography.labelSmall, color: colors.onSurfaceMuted },
+  divider: { width: 1, height: 56, backgroundColor: colors.outlineVariant },
 });
 
 // Business card
