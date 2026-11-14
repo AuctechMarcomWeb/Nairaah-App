@@ -96,6 +96,28 @@ function AddUserModal({ visible, onClose, sponsorId }) {
   const [city,       setCity]       = useState('');
   const [state,      setState]      = useState('');
   const [pincode,    setPincode]    = useState('');
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+
+  // Pincode se city/state auto-fill
+  const fetchLocationByPincode = async (pin) => {
+    if (!pin || pin.length !== 6) return;
+    setPincodeLoading(true);
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await res.json();
+      if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length > 0) {
+        const po = data[0].PostOffice[0];
+        setCity(po.District || '');
+        setState(po.State || '');
+      } else {
+        Alert.alert('Invalid Pincode', 'City/State not found for this pincode.');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not fetch location. Check internet connection.');
+    } finally {
+      setPincodeLoading(false);
+    }
+  };
 
   const [accHolder,  setAccHolder]  = useState('');
   const [bankName,   setBankName]   = useState('');
@@ -255,11 +277,23 @@ function AddUserModal({ visible, onClose, sponsorId }) {
                     <SectionHead iconName={Icons.address} label="Address" />
                     <Field label="Address" value={address} onChangeText={setAddress} placeholder="House / Street / Area" />
                     <View style={am.twoCol}>
-                      <View style={{ flex: 1 }}><Field label="City" value={city} onChangeText={setCity} placeholder="City" /></View>
+                      <View style={{ flex: 1 }}>
+                        <Field
+                          label="Pincode"
+                          value={pincode}
+                          onChangeText={(v) => {
+                            setPincode(v);
+                            if (v.length === 6) fetchLocationByPincode(v);
+                          }}
+                          placeholder="6-digit"
+                          keyboardType="numeric"
+                          hint={pincodeLoading ? 'Fetching city/state...' : ''}
+                        />
+                      </View>
                       <View style={{ width: spacing.md }} />
-                      <View style={{ flex: 1 }}><Field label="State" value={state} onChangeText={setState} placeholder="State" /></View>
+                      <View style={{ flex: 1 }}><Field label="City" value={city} onChangeText={setCity} placeholder="Auto-filled" /></View>
                     </View>
-                    <Field label="Pincode" value={pincode} onChangeText={setPincode} placeholder="6-digit" keyboardType="numeric" />
+                    <Field label="State" value={state} onChangeText={setState} placeholder="Auto-filled" />
                   </View>
                 )}
 

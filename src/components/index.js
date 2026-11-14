@@ -189,7 +189,7 @@ const btnStyles = StyleSheet.create({
 
 // ── FormField ─────────────────────────────────────────────
 // Fully working labeled TextInput (replaces the old stub)
-export function FormField({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry, multiline, editable = true }) {
+export function FormField({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry, multiline, editable = true, hint }) {
   const [focused, setFocused] = React.useState(false);
   return (
     <View style={fldStyles.wrapper}>
@@ -213,6 +213,7 @@ export function FormField({ label, value, onChangeText, placeholder, keyboardTyp
         onBlur={() => setFocused(false)}
         textAlignVertical={multiline ? 'top' : 'center'}
       />
+      {hint ? <Text style={fldStyles.hint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -233,6 +234,7 @@ const fldStyles = StyleSheet.create({
   inputFocused: { borderColor: colors.primary, backgroundColor: colors.surface },
   inputMulti: { height: 80, paddingTop: 12 },
   inputDisabled: { backgroundColor: colors.surfaceVariant, color: colors.onSurfaceMuted },
+  hint: { fontSize: 11, color: colors.primary, marginTop: 3 },
 });
 
 // ── SectionHeader ─────────────────────────────────────────

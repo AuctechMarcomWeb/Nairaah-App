@@ -50,7 +50,7 @@ const sc = StyleSheet.create({
 });
 
 // ─── Text Field ───────────────────────────────────────────────────────────────
-function Field({ label, value, onChangeText, placeholder, keyboardType, multiline, required }) {
+function Field({ label, value, onChangeText, placeholder, keyboardType, multiline, required, hint }) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={fl.wrap}>
@@ -66,6 +66,7 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, multilin
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         autoCapitalize="none"
       />
+      {hint ? <Text style={fl.hint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -75,6 +76,7 @@ const fl = StyleSheet.create({
   input:   { borderWidth: 1.5, borderColor: colors.outline, borderRadius: radius.md, height: 48, paddingHorizontal: spacing.md, ...typography.bodyMedium, color: colors.onSurface, backgroundColor: colors.background },
   focused: { borderColor: colors.primary, backgroundColor: colors.surface },
   multi:   { height: 80, paddingTop: 12 },
+  hint:    { fontSize: 11, color: colors.primary, marginTop: 3 },
 });
 
 // ─── Success Modal ────────────────────────────────────────────────────────────
@@ -146,6 +148,32 @@ export default function CreateSaleScreen({ navigation, route }) {
   const [shipCity,    setShipCity]    = useState('');
   const [shipState,   setShipState]   = useState('');
   const [shipAddress, setShipAddress] = useState('');
+
+  const [buyerPincodeLoading, setBuyerPincodeLoading] = useState(false);
+  const [shipPincodeLoading,  setShipPincodeLoading]  = useState(false);
+
+  // Pincode se city/state auto-fill
+  const fetchLocationByPincode = async (pin, type) => {
+    if (!pin || pin.length !== 6) return;
+    if (type === 'buyer') setBuyerPincodeLoading(true);
+    else setShipPincodeLoading(true);
+    try {
+      const res  = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await res.json();
+      if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length > 0) {
+        const po = data[0].PostOffice[0];
+        if (type === 'buyer') { setNewCity(po.District || ''); setNewState(po.State || ''); }
+        else                  { setShipCity(po.District || ''); setShipState(po.State || ''); }
+      } else {
+        Alert.alert('Invalid Pincode', 'City/State not found for this pincode.');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not fetch location. Check internet connection.');
+    } finally {
+      if (type === 'buyer') setBuyerPincodeLoading(false);
+      else setShipPincodeLoading(false);
+    }
+  };
 
   const [productList,  setProductList]  = useState([]);
   const [cartItems,    setCartItems]    = useState(
@@ -471,11 +499,11 @@ export default function CreateSaleScreen({ navigation, route }) {
                   </View>
                 </View>
                 <View style={s.threeCol}>
-                  <View style={{ flex: 1.2 }}><Field label="Pincode" value={newPincode} onChangeText={setNewPincode} placeholder="6-digit" keyboardType="numeric" /></View>
+                  <View style={{ flex: 1.2 }}><Field label="Pincode" value={newPincode} onChangeText={(v) => { setNewPincode(v); if (v.length === 6) fetchLocationByPincode(v, 'buyer'); }} placeholder="6-digit" keyboardType="numeric" hint={buyerPincodeLoading ? 'Fetching...' : ''} /></View>
                   <View style={{ width: spacing.sm }} />
-                  <View style={{ flex: 1.5 }}><Field label="City" value={newCity} onChangeText={setNewCity} placeholder="e.g. Barabanki" /></View>
+                  <View style={{ flex: 1.5 }}><Field label="City" value={newCity} onChangeText={setNewCity} placeholder="Auto-filled" /></View>
                   <View style={{ width: spacing.sm }} />
-                  <View style={{ flex: 1.5 }}><Field label="State" value={newState} onChangeText={setNewState} placeholder="e.g. Uttar Pradesh" /></View>
+                  <View style={{ flex: 1.5 }}><Field label="State" value={newState} onChangeText={setNewState} placeholder="Auto-filled" /></View>
                 </View>
                 <Field label="Address" value={newAddress} onChangeText={setNewAddress} placeholder="House no., Street, Locality..." multiline />
               </View>
@@ -523,11 +551,11 @@ export default function CreateSaleScreen({ navigation, route }) {
                   <View style={{ flex: 1 }}><Field label="Phone" value={shipPhone} onChangeText={setShipPhone} placeholder="Mobile no." keyboardType="phone-pad" /></View>
                 </View>
                 <View style={s.threeCol}>
-                  <View style={{ flex: 1.2 }}><Field label="Pincode" value={shipPincode} onChangeText={setShipPincode} placeholder="6-digit" keyboardType="numeric" /></View>
+                  <View style={{ flex: 1.2 }}><Field label="Pincode" value={shipPincode} onChangeText={(v) => { setShipPincode(v); if (v.length === 6) fetchLocationByPincode(v, 'ship'); }} placeholder="6-digit" keyboardType="numeric" hint={shipPincodeLoading ? 'Fetching...' : ''} /></View>
                   <View style={{ width: spacing.sm }} />
-                  <View style={{ flex: 1.5 }}><Field label="City"  value={shipCity}  onChangeText={setShipCity}  placeholder="City" /></View>
+                  <View style={{ flex: 1.5 }}><Field label="City"  value={shipCity}  onChangeText={setShipCity}  placeholder="Auto-filled" /></View>
                   <View style={{ width: spacing.sm }} />
-                  <View style={{ flex: 1.5 }}><Field label="State" value={shipState} onChangeText={setShipState} placeholder="State" /></View>
+                  <View style={{ flex: 1.5 }}><Field label="State" value={shipState} onChangeText={setShipState} placeholder="Auto-filled" /></View>
                 </View>
                 <Field label="Address" value={shipAddress} onChangeText={setShipAddress} placeholder="House no., Street, Locality" multiline />
               </>

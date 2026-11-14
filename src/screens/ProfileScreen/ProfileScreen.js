@@ -29,6 +29,26 @@ export default function ProfileScreen({ navigation }) {
   });
 
   const [saveLoading, setSaveLoading] = useState(false);
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+
+  const fetchLocationByPincode = async (pin) => {
+    if (!pin || pin.length !== 6) return;
+    setPincodeLoading(true);
+    try {
+      const res  = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await res.json();
+      if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length > 0) {
+        const po = data[0].PostOffice[0];
+        setForm(prev => ({ ...prev, city: po.District || prev.city, state: po.State || prev.state }));
+      } else {
+        Alert.alert('Invalid Pincode', 'City/State not found for this pincode.');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not fetch location. Check internet connection.');
+    } finally {
+      setPincodeLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     const id = user?._id || user?.userId;
@@ -175,9 +195,18 @@ export default function ProfileScreen({ navigation }) {
             <FormField label="Mobile Number"  value={form.mobile}  onChangeText={v => setForm({ ...form, mobile: v })}  keyboardType="phone-pad" />
             <FormField label="Email Address"  value={form.email}   onChangeText={v => setForm({ ...form, email: v })}   keyboardType="email-address" />
             <FormField label="Address"        value={form.address} onChangeText={v => setForm({ ...form, address: v })} />
-            <FormField label="City"           value={form.city}    onChangeText={v => setForm({ ...form, city: v })} />
-            <FormField label="State"          value={form.state}   onChangeText={v => setForm({ ...form, state: v })} />
-            <FormField label="Pincode"        value={form.pincode} onChangeText={v => setForm({ ...form, pincode: v })} keyboardType="numeric" />
+            <FormField label="City"           value={form.city}    onChangeText={v => setForm({ ...form, city: v })} placeholder="Auto-filled" />
+            <FormField label="State"          value={form.state}   onChangeText={v => setForm({ ...form, state: v })} placeholder="Auto-filled" />
+            <FormField
+              label="Pincode"
+              value={form.pincode}
+              onChangeText={v => {
+                setForm({ ...form, pincode: v });
+                if (v.length === 6) fetchLocationByPincode(v);
+              }}
+              keyboardType="numeric"
+              hint={pincodeLoading ? 'Fetching city/state...' : ''}
+            />
 
             <View style={s.editBtns}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setEditMode(false)}>
