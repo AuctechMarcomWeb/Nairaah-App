@@ -678,19 +678,57 @@ export default function AddMemberScreen({ navigation }) {
         </View>
 
         {/* Filters */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterScroll}>
-          {typeFilters.map(([val, lbl]) => (
-            <TouchableOpacity key={val} style={[s.chip, filterType === val && s.chipActive]} onPress={() => setFilterType(val)}>
-              <Text style={[s.chipTxt, filterType === val && s.chipTxtActive]}>{lbl}</Text>
-            </TouchableOpacity>
-          ))}
-          <View style={s.filterDiv} />
-          {statusFilters.map(([val, lbl]) => (
-            <TouchableOpacity key={val} style={[s.chip, filterStatus === val && s.chipActive]} onPress={() => setFilterStatus(val)}>
-              <Text style={[s.chipTxt, filterStatus === val && s.chipTxtActive]}>{lbl}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={s.filterContainer}>
+          {/* Row 1: Type filter */}
+          <View style={s.filterRow}>
+            <View style={s.filterLabelWrap}>
+              <Icon name={Icons.distributor} size={12} color={colors.onSurfaceMuted} />
+              <Text style={s.filterLabel}>Type</Text>
+            </View>
+            <View style={s.filterChips}>
+              {typeFilters.map(([val, lbl]) => {
+                const active = filterType === val;
+                const color = val === 'Customer' ? colors.success : val === 'Distributor' ? '#7C3AED' : colors.primary;
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    style={[s.chip, active && { backgroundColor: color + '18', borderColor: color }]}
+                    onPress={() => setFilterType(val)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.chipTxt, active && { color: color, fontWeight: '700' }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Row 2: Status filter */}
+          <View style={[s.filterRow, { marginBottom: 0 }]}>
+            <View style={s.filterLabelWrap}>
+              <Icon name={Icons.success} size={12} color={colors.onSurfaceMuted} />
+              <Text style={s.filterLabel}>Status</Text>
+            </View>
+            <View style={s.filterChips}>
+              {statusFilters.map(([val, lbl]) => {
+                const active = filterStatus === val;
+                const color = val === 'true' ? colors.success : val === 'false' ? colors.error : colors.primary;
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    style={[s.chip, active && { backgroundColor: color + '18', borderColor: color }]}
+                    onPress={() => setFilterStatus(val)}
+                    activeOpacity={0.75}
+                  >
+                    {val === 'true' && <View style={[s.dot, { backgroundColor: colors.success }]} />}
+                    {val === 'false' && <View style={[s.dot, { backgroundColor: colors.error }]} />}
+                    <Text style={[s.chipTxt, active && { color: color, fontWeight: '700' }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
 
         {/* List */}
         {loading ? (
@@ -742,12 +780,14 @@ const s = StyleSheet.create({
   statDiv:   { width: 1, backgroundColor: colors.divider },
   searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.outline, marginBottom: 8, ...elevation.level1 },
   searchInput:{ flex: 1, height: 44, paddingHorizontal: 8, ...typography.bodyMedium, color: colors.onSurface },
-  filterScroll:{ maxHeight: 48, marginBottom: 8 },
-  chip:        { paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.surface, marginRight: 8 },
-  chipActive:  { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
+  filterContainer: { backgroundColor: colors.surface, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginBottom: 8, ...elevation.level1, gap: 6 },
+  filterRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  filterLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 4, width: 52 },
+  filterLabel: { ...typography.labelSmall, color: colors.onSurfaceMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  filterChips: { flexDirection: 'row', gap: 7, flex: 1, flexWrap: 'wrap' },
+  chip:        { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.background },
   chipTxt:     { ...typography.labelMedium, color: colors.onSurfaceMuted },
-  chipTxtActive:{ color: colors.primary, fontWeight: '700' },
-  filterDiv:   { width: 1, backgroundColor: colors.divider, marginRight: 8, height: 28, alignSelf: 'center' },
+  dot:         { width: 6, height: 6, borderRadius: 3 },
   empty:       { alignItems: 'center', paddingVertical: 48 },
   emptyTxt:    { ...typography.bodyMedium, color: colors.onSurfaceMuted, marginBottom: 16 },
   addBtn:      { backgroundColor: colors.primaryContainer, borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 12 },
