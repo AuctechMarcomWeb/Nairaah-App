@@ -26,10 +26,12 @@ export function PickerModal({
     ? items.filter(item => {
         const q = query.toLowerCase();
         return (
-          (item.name     || '').toLowerCase().includes(q) ||
-          (item.userId   || '').toLowerCase().includes(q) ||
-          (item.phone    || '').toLowerCase().includes(q) ||
-          (item.mobile   || '').toLowerCase().includes(q)
+          (item.name        || '').toLowerCase().includes(q) ||
+          (item.userId      || '').toLowerCase().includes(q) ||
+          (item.phone       || '').toLowerCase().includes(q) ||
+          (item.mobile      || '').toLowerCase().includes(q) ||
+          (item.productCode || '').toLowerCase().includes(q) ||
+          (item.code        || '').toLowerCase().includes(q)
         );
       })
     : items;

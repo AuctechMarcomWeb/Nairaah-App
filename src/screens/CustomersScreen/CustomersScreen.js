@@ -193,7 +193,9 @@ export default function CustomersScreen({ navigation }) {
 
   const filtered = customers.filter(c =>
     (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.id || '').toLowerCase().includes(search.toLowerCase()),
+    (c.id || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.mobile || '').includes(search) ||
+    (c.email || '').toLowerCase().includes(search.toLowerCase()),
   );
 
   const handleConvert = (customer) => {
