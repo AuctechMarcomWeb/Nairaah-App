@@ -26,7 +26,7 @@ import Icon from '../../components/Icon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '../../themes';
 
-const { height: H } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const dispatch = useDispatch();
