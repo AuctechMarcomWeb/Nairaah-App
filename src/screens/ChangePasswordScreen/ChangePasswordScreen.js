@@ -95,6 +95,12 @@ export default function ChangePasswordScreen({ navigation }) {
               loading={loading}
               disabled={loading}
             />
+
+            <View style={s.contactBox}>
+              <Text style={s.contactHint}>Forgot your current password? Contact support:</Text>
+              <Text style={s.contactItem}>📧  info@nairaah.in</Text>
+              <Text style={s.contactItem}>📞  7007416905</Text>
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -109,4 +115,7 @@ const s = StyleSheet.create({
   iconRow:   { alignItems: 'center', marginBottom: 8 },
   icon:      { fontSize: 48 },
   subtitle:  { ...typography.bodyMedium, color: colors.onSurfaceMuted, textAlign: 'center', marginBottom: spacing.xl },
+  contactBox:  { marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.divider, alignItems: 'center', gap: 6 },
+  contactHint: { ...typography.bodySmall, color: colors.onSurfaceMuted, textAlign: 'center', marginBottom: 4 },
+  contactItem: { ...typography.bodyMedium, color: colors.primary, fontWeight: '600' },
 });

@@ -75,11 +75,16 @@ export const updateUserProfile = async (id, data) => {
 
 /**
  * POST /api/auth/updatePassword
- * Change own password
+ * Change own password — backend requires userId, oldPassword, newPassword
  */
 export const updatePassword = async (oldPassword, newPassword) => {
   try {
-    const response = await authApi.post('/updatePassword', { oldPassword, newPassword });
+    // userId (MongoDB _id) get karo Redux store se
+    const { default: store } = await import('../redux/store');
+    const userId = store.getState().user?.user?._id;
+    if (!userId) return { success: false, message: 'User not found. Please login again.' };
+
+    const response = await authApi.post('/updatePassword', { userId, oldPassword, newPassword });
     if (response.data.success) {
       return { success: true, message: response.data.message };
     }
