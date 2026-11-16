@@ -265,7 +265,7 @@ export function EmptyState({ icon, iconName, message }) {
     <View style={emptyStyles.container}>
       {iconName
         ? <Icon name={iconName} size={48} color={colors.onSurfaceMuted} style={{ marginBottom: 12, opacity: 0.5 }} />
-        : <Text style={emptyStyles.icon}>{icon || '📭'}</Text>}
+        : <Icon name="inbox-outline" size={48} color={colors.onSurfaceMuted} style={{ marginBottom: 12, opacity: 0.5 }} />}
       <Text style={emptyStyles.message}>{message || 'No data found'}</Text>
     </View>
   );

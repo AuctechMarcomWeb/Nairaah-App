@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, spacing, radius, elevation, typography } from '../themes';
+import Icon from './Icon';
 
 /**
  * SearchBar — reusable search input
@@ -9,7 +10,7 @@ import { colors, spacing, radius, elevation, typography } from '../themes';
 export function SearchBar({ value, onChangeText, placeholder, focused, onFocus, onBlur, style }) {
   return (
     <View style={[s.box, focused && s.boxFocused, style]}>
-      <Text style={s.icon}>🔍</Text>
+      <Icon name="magnify" size={15} color={colors.onSurfaceMuted} style={{ marginRight: 8 }} />
       <TextInput
         style={s.input}
         placeholder={placeholder || 'Search...'}
@@ -21,7 +22,7 @@ export function SearchBar({ value, onChangeText, placeholder, focused, onFocus, 
       />
       {value?.length > 0 && (
         <TouchableOpacity onPress={() => onChangeText('')}>
-          <Text style={s.clear}>✕</Text>
+          <Icon name="close" size={15} color={colors.onSurfaceMuted} style={{ padding: 4 }} />
         </TouchableOpacity>
       )}
     </View>

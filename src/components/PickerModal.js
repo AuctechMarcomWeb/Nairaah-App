@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { colors, spacing, radius, elevation, typography } from '../themes';
 import { Divider } from './index';
+import Icon from './Icon';
 
 /**
  * PickerModal — generic bottom-sheet picker with optional search + "Add New" button
@@ -50,7 +51,7 @@ export function PickerModal({
           {/* Search bar */}
           {searchable && (
             <View style={s.searchRow}>
-              <Text style={s.searchIcon}>🔍</Text>
+              <Icon name="magnify" size={15} color={colors.onSurfaceMuted} style={{ marginRight: 6 }} />
               <TextInput
                 style={s.searchInput}
                 value={query}
@@ -60,7 +61,7 @@ export function PickerModal({
               />
               {query.length > 0 && (
                 <TouchableOpacity onPress={() => setQuery('')}>
-                  <Text style={s.clearBtn}>✕</Text>
+                  <Icon name="close" size={16} color={colors.onSurfaceMuted} style={{ paddingHorizontal: 6 }} />
                 </TouchableOpacity>
               )}
             </View>
@@ -88,7 +89,7 @@ export function PickerModal({
               keyboardShouldPersistTaps="handled"
               ListEmptyComponent={
                 <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                  <Text style={{ fontSize: 36, marginBottom: 8 }}>📭</Text>
+                  <Icon name="inbox-outline" size={40} color={colors.onSurfaceMuted} style={{ opacity: 0.4, marginBottom: 10 }} />
                   <Text style={{ color: colors.onSurfaceMuted, fontSize: 14 }}>
                     {query.trim() ? 'No results found' : 'No items found'}
                   </Text>

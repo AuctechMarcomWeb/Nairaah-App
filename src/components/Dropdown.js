@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, spacing, radius, elevation, typography } from '../themes';
+import Icon from './Icon';
 
 /**
  * Dropdown — inline dropdown with overlay menu
@@ -16,7 +17,11 @@ export function Dropdown({ label, value, options, onSelect }) {
         activeOpacity={0.8}>
         <Text style={s.triggerLabel}>{label}</Text>
         <Text style={s.triggerValue} numberOfLines={1}>{value}</Text>
-        <Text style={[s.arrow, open && s.arrowUp]}>▾</Text>
+        <Icon
+          name={open ? 'menu-up' : 'menu-down'}
+          size={18}
+          color={open ? colors.primary : colors.onSurfaceMuted}
+        />
       </TouchableOpacity>
       {open && (
         <View style={s.menu}>
@@ -25,7 +30,9 @@ export function Dropdown({ label, value, options, onSelect }) {
               key={opt}
               style={[s.menuItem, value === opt && s.menuItemActive]}
               onPress={() => { onSelect(opt); setOpen(false); }}>
-              {value === opt && <Text style={s.menuCheck}>✓ </Text>}
+              {value === opt && (
+                <Icon name="check" size={14} color={colors.primary} style={{ marginRight: 6 }} />
+              )}
               <Text style={[s.menuItemText, value === opt && s.menuItemTextActive]}>
                 {opt}
               </Text>
@@ -49,8 +56,6 @@ const s = StyleSheet.create({
   triggerOpen: { borderColor: colors.primary },
   triggerLabel: { ...typography.labelSmall, color: colors.onSurfaceMuted, marginRight: 4 },
   triggerValue: { ...typography.titleSmall, color: colors.onSurface, flex: 1 },
-  arrow: { fontSize: 13, color: colors.onSurfaceMuted, marginLeft: 4 },
-  arrowUp: { transform: [{ rotate: '180deg' }], color: colors.primary },
   menu: {
     position: 'absolute', top: 48, left: 0, right: 0,
     backgroundColor: colors.surface,
@@ -67,7 +72,6 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.divider,
   },
   menuItemActive: { backgroundColor: colors.primaryContainer },
-  menuCheck: { ...typography.titleSmall, color: colors.primary, marginRight: 2 },
   menuItemText: { ...typography.bodyMedium, color: colors.onSurface },
   menuItemTextActive: { color: colors.primary, fontWeight: '700' },
 });

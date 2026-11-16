@@ -216,10 +216,15 @@ export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashbo
         <Text style={s.logoutText}>Logout</Text>
       </TouchableOpacity>
 
-      {/* ── Contact Info ── */}
       <View style={s.contactBox}>
-        <Text style={s.contactItem}>📧  info@nairaah.in</Text>
-        <Text style={s.contactItem}>📞  7007416905</Text>
+        <View style={s.contactRow}>
+          <Icon name="email-outline" size={13} color="rgba(255,255,255,0.45)" />
+          <Text style={s.contactItem}>  info@nairaah.in</Text>
+        </View>
+        <View style={s.contactRow}>
+          <Icon name="phone-outline" size={13} color="rgba(255,255,255,0.45)" />
+          <Text style={s.contactItem}>  7007416905</Text>
+        </View>
       </View>
     </LinearGradient>
   );
@@ -307,7 +312,8 @@ const s = StyleSheet.create({
   contactBox: {
     paddingHorizontal: 16, paddingBottom: 20, paddingTop: 8,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
-    gap: 4,
+    gap: 6,
   },
+  contactRow: { flexDirection: 'row', alignItems: 'center' },
   contactItem: { fontSize: 12, color: 'rgba(255,255,255,0.45)' },
 });
