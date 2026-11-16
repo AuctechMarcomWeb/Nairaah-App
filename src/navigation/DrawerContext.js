@@ -1,9 +1,11 @@
-import React, { createContext, useState, useCallback } from 'react';
+import React, { createContext, useState, useCallback, useRef } from 'react';
 
 export const DrawerContext = createContext({
-  isOpen: false,
-  openDrawer: () => {},
+  isOpen:      false,
+  openDrawer:  () => {},
   closeDrawer: () => {},
+  // Internal — used by DrawerOverlay to signal animation finished
+  _setOpen:    () => {},
 });
 
 export const DrawerProvider = ({ children }) => {
@@ -13,6 +15,7 @@ export const DrawerProvider = ({ children }) => {
     setIsOpen(true);
   }, []);
 
+  // closeDrawer just flips the flag — DrawerOverlay handles animation then hides
   const closeDrawer = useCallback(() => {
     setIsOpen(false);
   }, []);
@@ -26,8 +29,6 @@ export const DrawerProvider = ({ children }) => {
 
 export const useDrawer = () => {
   const context = React.useContext(DrawerContext);
-  if (!context) {
-    throw new Error('useDrawer must be used within DrawerProvider');
-  }
+  if (!context) throw new Error('useDrawer must be used within DrawerProvider');
   return context;
 };

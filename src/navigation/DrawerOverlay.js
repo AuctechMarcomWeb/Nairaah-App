@@ -1,24 +1,63 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Modal,
-  Pressable,
-  Dimensions,
-  StyleSheet,
-  BackHandler,
+  View, Modal, Pressable, Dimensions,
+  StyleSheet, BackHandler, Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDrawer } from './DrawerContext';
 import Sidebar from '../components/Sidebar';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const DRAWER_W = SCREEN_W * 0.75;
+const { width: W } = Dimensions.get('window');
+const DRAWER_W  = W * 0.78;
+const OPEN_MS   = 280;
+const CLOSE_MS  = 240;
 
 export const DrawerOverlay = () => {
-  const navigation = useNavigation();
+  const navigation              = useNavigation();
   const { isOpen, closeDrawer } = useDrawer();
 
-  // Android back button closes drawer
+  // modalVisible stays true during close animation so Modal doesn't vanish instantly
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const slideAnim   = useRef(new Animated.Value(0)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isOpen) {
+      // Reset to hidden position first, then show Modal, then animate in
+      slideAnim.setValue(0);
+      overlayAnim.setValue(0);
+      setModalVisible(true);
+      // requestAnimationFrame ensures Modal is rendered before animation starts
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.spring(slideAnim, {
+            toValue: 1,
+            speed: 14,         // higher = faster
+            bounciness: 2,     // slight natural ease, no bounce
+            useNativeDriver: true,
+          }),
+          Animated.timing(overlayAnim, {
+            toValue: 1, duration: OPEN_MS, useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    } else {
+      // Slide out — hide Modal only after animation finishes
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0, duration: CLOSE_MS, useNativeDriver: true,
+        }),
+        Animated.timing(overlayAnim, {
+          toValue: 0, duration: CLOSE_MS, useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) setModalVisible(false);
+      });
+    }
+  }, [isOpen]);
+
+  // Android back button
   useEffect(() => {
     if (!isOpen) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -38,47 +77,67 @@ export const DrawerOverlay = () => {
     }
   };
 
+  const translateX = slideAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [-DRAWER_W, 0],
+  });
+
+  const overlayOpacity = overlayAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [0, 0.55],
+  });
+
   return (
     <Modal
-      visible={isOpen}
+      visible={modalVisible}
       transparent
       animationType="none"
       onRequestClose={closeDrawer}
+      statusBarTranslucent
     >
-      {/* Full screen row: drawer on left, pressable dismiss area on right */}
-      <View style={styles.root}>
+      <View style={s.root}>
 
-        {/* Drawer panel */}
-        <View style={styles.drawer}>
+        {/* Dimmed background */}
+        <Animated.View
+          style={[s.overlay, { opacity: overlayOpacity }]}
+          pointerEvents="none"
+        />
+
+        {/* Sliding sidebar */}
+        <Animated.View style={[s.drawer, { transform: [{ translateX }] }]}>
           <Sidebar
             closeDrawer={closeDrawer}
             navigation={navigation}
             activeRoute={getActiveRouteName()}
           />
-        </View>
+        </Animated.View>
 
-        {/* Tap this area to close */}
-        <Pressable style={styles.dismissArea} onPress={closeDrawer} />
+        {/* Tap outside to close */}
+        <Pressable style={s.dismissArea} onPress={closeDrawer} />
 
       </View>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   root: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
   },
   drawer: {
     width: DRAWER_W,
-    backgroundColor: '#FFFFFF',
+    height: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 20,
+    shadowOffset: { width: 6, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 24,
+    zIndex: 10,
   },
   dismissArea: {
     flex: 1,
