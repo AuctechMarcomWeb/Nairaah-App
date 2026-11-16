@@ -79,9 +79,9 @@ function DetailModal({ visible, product, onClose, onCreateSale }) {
   if (!product) return null;
   const imageUrl = product.images?.[0] || null;
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={dm.overlay}>
-        <View style={dm.sheet}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={dm.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={dm.handle} />
           <View style={dm.imageArea}>
             {imageUrl ? (
@@ -128,8 +128,8 @@ function DetailModal({ visible, product, onClose, onCreateSale }) {
           <TouchableOpacity style={dm.closeBtn} onPress={onClose}>
             <Text style={dm.closeBtnText}>Close</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }

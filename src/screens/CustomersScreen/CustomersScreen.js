@@ -58,9 +58,9 @@ const cc = StyleSheet.create({
 function DetailModal({ visible, customer, onClose, onConvert }) {
   if (!customer) return null;
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={dm.overlay}>
-        <View style={dm.sheet}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={dm.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={dm.handle} />
 
           <View style={dm.header}>
@@ -102,8 +102,8 @@ function DetailModal({ visible, customer, onClose, onConvert }) {
           <TouchableOpacity style={dm.closeBtn} onPress={onClose}>
             <Text style={dm.closeBtnText}>Close</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }

@@ -27,10 +27,10 @@ function flattenTeam(members) {
 function PayoutDetailModal({ visible, item, onClose }) {
   if (!item) return null;
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={dm.overlay}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={onClose}>
         <ScrollView>
-          <View style={dm.sheet}>
+          <TouchableOpacity style={dm.sheet} activeOpacity={1} onPress={() => {}}>
             <View style={dm.handle} />
             <View style={dm.titleRow}>
               <Text style={dm.title}>Payout Details</Text>
@@ -100,9 +100,9 @@ function PayoutDetailModal({ visible, item, onClose }) {
             <TouchableOpacity style={dm.closeBtn} onPress={onClose}>
               <Text style={dm.closeBtnText}>Close</Text>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </ScrollView>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 }

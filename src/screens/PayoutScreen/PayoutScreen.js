@@ -64,8 +64,8 @@ function DetailModal({ visible, item, onClose }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={dm.overlay}>
-        <View style={dm.sheet}>
+      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={dm.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={dm.handle} />
 
           {/* Header */}
@@ -111,8 +111,8 @@ function DetailModal({ visible, item, onClose }) {
           <TouchableOpacity style={dm.closeBtn} onPress={onClose}>
             <Text style={dm.closeTxt}>Close</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }

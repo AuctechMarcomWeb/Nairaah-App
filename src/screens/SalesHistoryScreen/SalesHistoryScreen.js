@@ -88,8 +88,8 @@ function FilterSheet({ visible, onClose, filters, onApply }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={fs.overlay}>
-        <View style={fs.sheet}>
+      <TouchableOpacity style={fs.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={fs.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={fs.handle} />
           <View style={fs.titleRow}>
             <Text style={fs.title}>Filters</Text>
@@ -112,8 +112,8 @@ function FilterSheet({ visible, onClose, filters, onApply }) {
             onPress={() => { onApply(local); onClose(); }}>
             <Text style={fs.applyTxt}>Apply Filters</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -188,8 +188,8 @@ function OrderDetailModal({ visible, order, onClose, onCancel, onRefresh }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={dm.overlay}>
-        <View style={dm.sheet}>
+      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={dm.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={dm.handle} />
 
           {/* Header */}
@@ -361,8 +361,8 @@ function OrderDetailModal({ visible, order, onClose, onCancel, onRefresh }) {
                 )}
             </TouchableOpacity>
           )}
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }

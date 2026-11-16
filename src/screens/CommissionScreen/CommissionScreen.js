@@ -307,8 +307,8 @@ function LevelMembersModal({ visible, userId, level, levelLabel, fromYMD, toYMD,
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={lmm.overlay}>
-        <View style={lmm.sheet}>
+      <TouchableOpacity style={lmm.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={lmm.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={lmm.handle} />
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
             <View style={lmm.avatar}><Text style={lmm.avatarTxt}>{levelLabel}</Text></View>
@@ -353,8 +353,8 @@ function LevelMembersModal({ visible, userId, level, levelLabel, fromYMD, toYMD,
           <TouchableOpacity style={lmm.closeBtn} onPress={onClose}>
             <Text style={lmm.closeBtnTxt}>Close</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -389,8 +389,8 @@ function LevelEarningModal({ visible, userId, fromYMD, toYMD, rootLevel, onClose
   return (
     <>
       <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-        <View style={lem.overlay}>
-          <View style={lem.sheet}>
+        <TouchableOpacity style={lem.overlay} activeOpacity={1} onPress={onClose}>
+          <TouchableOpacity style={lem.sheet} activeOpacity={1} onPress={() => {}}>
             <View style={lem.handle} />
             <Text style={lem.title}>Level-wise Earning Summary</Text>
             <Text style={{ ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 2, marginBottom: 14 }}>
@@ -439,8 +439,8 @@ function LevelEarningModal({ visible, userId, fromYMD, toYMD, rootLevel, onClose
             <TouchableOpacity style={lmm.closeBtn} onPress={onClose}>
               <Text style={lmm.closeBtnTxt}>Close</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
       <LevelMembersModal
         visible={!!drill} userId={userId}

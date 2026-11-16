@@ -185,8 +185,8 @@ function AddUserModal({ visible, onClose, sponsorId }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={am.overlay}>
-        <View style={am.sheet}>
+      <TouchableOpacity style={am.overlay} activeOpacity={1} onPress={handleClose}>
+        <TouchableOpacity style={am.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={am.handle} />
 
           {/* Title */}
@@ -355,8 +355,8 @@ function AddUserModal({ visible, onClose, sponsorId }) {
               />
             </>
           )}
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -424,8 +424,8 @@ function UserDetailModal({ visible, userId, onClose, onConvert }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={vd.overlay}>
-        <View style={vd.sheet}>
+      <TouchableOpacity style={vd.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={vd.sheet} activeOpacity={1} onPress={() => {}}>
           <View style={vd.handle} />
 
           {/* Header */}
@@ -505,8 +505,8 @@ function UserDetailModal({ visible, userId, onClose, onConvert }) {
                 )}
             </TouchableOpacity>
           )}
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
