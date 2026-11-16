@@ -398,7 +398,12 @@ export default function CreateSaleScreen({ navigation, route }) {
 
   const handlePickScreenshot = () => {
     launchImageLibrary(
-      { mediaType: 'photo', quality: 0.8 },
+      {
+        mediaType:         'photo',
+        quality:           0.8,
+        selectionLimit:    1,          // sirf ek image
+        presentationStyle: 'pageSheet',
+      },
       async (response) => {
         if (response.didCancel || response.errorCode) return;
         const asset = response.assets?.[0];
