@@ -85,8 +85,12 @@ function DetailModal({ visible, item, onClose }) {
 
           <Divider style={{ marginVertical: 12 }} />
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-            {/* Period */}
+          {/* ScrollView takes remaining space — flex: 1 */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 8 }}
+          >
             <Text style={dm.section}>Period Info</Text>
             {rows.slice(0, 5).map(([label, val]) => (
               <View key={label} style={dm.row}>
@@ -97,7 +101,6 @@ function DetailModal({ visible, item, onClose }) {
 
             <Divider style={{ marginVertical: 10 }} />
 
-            {/* Commission & Business */}
             <Text style={dm.section}>Commission & Business</Text>
             {rows.slice(5).map(([label, val]) => (
               <View key={label} style={dm.row}>
@@ -118,7 +121,7 @@ function DetailModal({ visible, item, onClose }) {
 }
 const dm = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet:      { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 32, maxHeight: '88%' },
+  sheet:      { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, paddingBottom: 32, maxHeight: '92%', flex: 1 },
   handle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.outline, alignSelf: 'center', marginBottom: 16 },
   header:     { flexDirection: 'row', alignItems: 'flex-start' },
   title:      { ...typography.titleLarge, color: colors.primary, fontWeight: '700' },

@@ -12,7 +12,7 @@ import { createUser, getUsersCreatedBy, getUserById, convertToDistributor } from
 const fmtDate = (v) => v ? new Date(v).toLocaleDateString('en-IN') : '-';
 
 // ─── Text field ───────────────────────────────────────────────────────────────
-function Field({ label, value, onChangeText, placeholder, keyboardType, required, hint }) {
+function Field({ label, value, onChangeText, placeholder, keyboardType, required, hint, maxLength, autoCapitalize }) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={f.wrap}>
@@ -23,7 +23,8 @@ function Field({ label, value, onChangeText, placeholder, keyboardType, required
         placeholder={placeholder || ''} placeholderTextColor={colors.onSurfaceMuted}
         keyboardType={keyboardType || 'default'}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        autoCapitalize="none"
+        autoCapitalize={autoCapitalize || 'none'}
+        maxLength={maxLength}
       />
       {hint ? <Text style={f.hint}>{hint}</Text> : null}
     </View>
@@ -144,10 +145,64 @@ function AddUserModal({ visible, onClose, sponsorId }) {
   const handleClose = () => { resetAll(); onClose(); };
 
   const handleSubmit = async () => {
-    if (!name.trim())  { Alert.alert('Required', 'Full name is required.'); return; }
-    if (!phone.trim() || phone.trim().length !== 10) {
-      Alert.alert('Invalid', 'Please enter a valid 10-digit mobile number.'); return;
+    // ── Name ──────────────────────────────────────────────
+    if (!name.trim()) {
+      Alert.alert('Required', 'Full name is required.'); return;
     }
+    if (name.trim().length < 2) {
+      Alert.alert('Invalid', 'Name must be at least 2 characters.'); return;
+    }
+    if (!/^[a-zA-Z\s.'-]+$/.test(name.trim())) {
+      Alert.alert('Invalid', 'Name should only contain letters, spaces or dots.'); return;
+    }
+
+    // ── Phone ─────────────────────────────────────────────
+    const ph = phone.trim();
+    if (!ph) {
+      Alert.alert('Required', 'Mobile number is required.'); return;
+    }
+    if (!/^[6-9]\d{9}$/.test(ph)) {
+      Alert.alert('Invalid Mobile', 'Enter a valid 10-digit Indian mobile number starting with 6-9.'); return;
+    }
+
+    // ── Email (optional but validate format if entered) ───
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.'); return;
+    }
+
+    // ── Pincode (optional but validate if entered) ────────
+    if (pincode.trim() && !/^\d{6}$/.test(pincode.trim())) {
+      Alert.alert('Invalid Pincode', 'Pincode must be exactly 6 digits.'); return;
+    }
+
+    // ── Distributor-specific validations ──────────────────
+    if (userType === 'Distributor') {
+      // Bank — account number digits only, 9-18 chars
+      if (accNumber.trim() && !/^\d{9,18}$/.test(accNumber.trim())) {
+        Alert.alert('Invalid Account Number', 'Account number must be 9–18 digits only.'); return;
+      }
+      // IFSC — standard format
+      if (ifsc.trim() && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc.trim().toUpperCase())) {
+        Alert.alert('Invalid IFSC', 'IFSC format: 4 letters + 0 + 6 alphanumeric (e.g. SBIN0001234).'); return;
+      }
+      // UPI Mobile
+      if (upiMobile.trim() && !/^[6-9]\d{9}$/.test(upiMobile.trim())) {
+        Alert.alert('Invalid UPI Mobile', 'UPI mobile must be a valid 10-digit Indian number.'); return;
+      }
+      // Aadhaar — exactly 12 digits
+      if (aadhaar.trim() && !/^\d{12}$/.test(aadhaar.trim())) {
+        Alert.alert('Invalid Aadhaar', 'Aadhaar number must be exactly 12 digits.'); return;
+      }
+      // PAN — standard format
+      if (pan.trim() && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan.trim().toUpperCase())) {
+        Alert.alert('Invalid PAN', 'PAN format: 5 letters + 4 digits + 1 letter (e.g. ABCDE1234F).'); return;
+      }
+      // GST — standard format
+      if (gst.trim() && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gst.trim().toUpperCase())) {
+        Alert.alert('Invalid GST', 'Enter a valid 15-character GST number.'); return;
+      }
+    }
+
     setLoading(true);
     const res = await createUser({
       name: name.trim(), fatherName: fatherName.trim() || undefined,
@@ -245,21 +300,21 @@ function AddUserModal({ visible, onClose, sponsorId }) {
                 </View>
               )}
 
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 360 }}>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 440 }}>
 
                 {/* Personal Tab */}
                 {tab === 'personal' && (
                   <View style={{ paddingTop: 4 }}>
                     <SectionHead iconName={Icons.personal} label="Personal Details" />
                     <View style={am.twoCol}>
-                      <View style={{ flex: 1 }}><Field label="Full Name" value={name} onChangeText={setName} placeholder="Rahul Sharma" required /></View>
+                      <View style={{ flex: 1 }}><Field label="Full Name" value={name} onChangeText={v => setName(v.replace(/[^a-zA-Z\s.'-]/g, ''))} placeholder="Rahul Sharma" required maxLength={50} autoCapitalize="words" /></View>
                       <View style={{ width: spacing.md }} />
-                      <View style={{ flex: 1 }}><Field label="Father's Name" value={fatherName} onChangeText={setFatherName} placeholder="Vijay Sharma" /></View>
+                      <View style={{ flex: 1 }}><Field label="Father's Name" value={fatherName} onChangeText={v => setFatherName(v.replace(/[^a-zA-Z\s.'-]/g, ''))} placeholder="Vijay Sharma" maxLength={50} autoCapitalize="words" /></View>
                     </View>
                     <View style={am.twoCol}>
-                      <View style={{ flex: 1 }}><Field label="Mobile" value={phone} onChangeText={setPhone} placeholder="10-digit" keyboardType="phone-pad" required /></View>
+                      <View style={{ flex: 1 }}><Field label="Mobile" value={phone} onChangeText={v => setPhone(v.replace(/\D/g, ''))} placeholder="10-digit" keyboardType="phone-pad" required maxLength={10} /></View>
                       <View style={{ width: spacing.md }} />
-                      <View style={{ flex: 1 }}><Field label="Email" value={email} onChangeText={setEmail} placeholder="user@example.com" keyboardType="email-address" /></View>
+                      <View style={{ flex: 1 }}><Field label="Email" value={email} onChangeText={setEmail} placeholder="user@example.com" keyboardType="email-address" maxLength={80} /></View>
                     </View>
 
                     {/* Gender */}
@@ -275,25 +330,27 @@ function AddUserModal({ visible, onClose, sponsorId }) {
                     </View>
 
                     <SectionHead iconName={Icons.address} label="Address" />
-                    <Field label="Address" value={address} onChangeText={setAddress} placeholder="House / Street / Area" />
+                    <Field label="Address" value={address} onChangeText={setAddress} placeholder="House / Street / Area" maxLength={150} autoCapitalize="sentences" />
                     <View style={am.twoCol}>
                       <View style={{ flex: 1 }}>
                         <Field
                           label="Pincode"
                           value={pincode}
                           onChangeText={(v) => {
-                            setPincode(v);
-                            if (v.length === 6) fetchLocationByPincode(v);
+                            const clean = v.replace(/\D/g, '');
+                            setPincode(clean);
+                            if (clean.length === 6) fetchLocationByPincode(clean);
                           }}
                           placeholder="6-digit"
                           keyboardType="numeric"
+                          maxLength={6}
                           hint={pincodeLoading ? 'Fetching city/state...' : ''}
                         />
                       </View>
                       <View style={{ width: spacing.md }} />
-                      <View style={{ flex: 1 }}><Field label="City" value={city} onChangeText={setCity} placeholder="Auto-filled" /></View>
+                      <View style={{ flex: 1 }}><Field label="City" value={city} onChangeText={setCity} placeholder="Auto-filled" maxLength={50} autoCapitalize="words" /></View>
                     </View>
-                    <Field label="State" value={state} onChangeText={setState} placeholder="Auto-filled" />
+                    <Field label="State" value={state} onChangeText={setState} placeholder="Auto-filled" maxLength={50} autoCapitalize="words" />
                   </View>
                 )}
 
@@ -302,17 +359,17 @@ function AddUserModal({ visible, onClose, sponsorId }) {
                   <View style={{ paddingTop: 4 }}>
                     <SectionHead iconName={Icons.bank} label="Bank Details" />
                     <View style={am.twoCol}>
-                      <View style={{ flex: 1 }}><Field label="Account Holder Name" value={accHolder} onChangeText={setAccHolder} placeholder="As per bank" /></View>
+                      <View style={{ flex: 1 }}><Field label="Account Holder Name" value={accHolder} onChangeText={v => setAccHolder(v.replace(/[^a-zA-Z\s.]/g, ''))} placeholder="As per bank" maxLength={60} autoCapitalize="words" /></View>
                       <View style={{ width: spacing.md }} />
-                      <View style={{ flex: 1 }}><Field label="Bank Name" value={bankName} onChangeText={setBankName} placeholder="SBI / HDFC" /></View>
+                      <View style={{ flex: 1 }}><Field label="Bank Name" value={bankName} onChangeText={v => setBankName(v.replace(/[^a-zA-Z\s]/g, ''))} placeholder="SBI / HDFC" maxLength={50} autoCapitalize="words" /></View>
                     </View>
                     <View style={am.twoCol}>
-                      <View style={{ flex: 1 }}><Field label="Account Number" value={accNumber} onChangeText={setAccNumber} placeholder="Account no." keyboardType="numeric" /></View>
+                      <View style={{ flex: 1 }}><Field label="Account Number" value={accNumber} onChangeText={v => setAccNumber(v.replace(/\D/g, ''))} placeholder="Account no." keyboardType="numeric" maxLength={18} /></View>
                       <View style={{ width: spacing.md }} />
-                      <View style={{ flex: 1 }}><Field label="Branch Name" value={branch} onChangeText={setBranch} placeholder="Branch" /></View>
+                      <View style={{ flex: 1 }}><Field label="Branch Name" value={branch} onChangeText={v => setBranch(v.replace(/[^a-zA-Z\s]/g, ''))} placeholder="Branch" maxLength={50} autoCapitalize="words" /></View>
                     </View>
                     <View style={am.twoCol}>
-                      <View style={{ flex: 1 }}><Field label="IFSC Code" value={ifsc} onChangeText={setIfsc} placeholder="SBIN0001234" /></View>
+                      <View style={{ flex: 1 }}><Field label="IFSC Code" value={ifsc} onChangeText={v => setIfsc(v.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())} placeholder="SBIN0001234" maxLength={11} /></View>
                       <View style={{ width: spacing.md }} />
                       <View style={{ flex: 1 }}>
                         <Text style={f.label}>Account Type</Text>
@@ -326,9 +383,9 @@ function AddUserModal({ visible, onClose, sponsorId }) {
                       </View>
                     </View>
                     <View style={am.twoCol}>
-                      <View style={{ flex: 1 }}><Field label="UPI ID" value={upiId} onChangeText={setUpiId} placeholder="example@upi" /></View>
+                      <View style={{ flex: 1 }}><Field label="UPI ID" value={upiId} onChangeText={setUpiId} placeholder="example@upi" maxLength={50} /></View>
                       <View style={{ width: spacing.md }} />
-                      <View style={{ flex: 1 }}><Field label="UPI Mobile" value={upiMobile} onChangeText={setUpiMobile} placeholder="10-digit" keyboardType="phone-pad" /></View>
+                      <View style={{ flex: 1 }}><Field label="UPI Mobile" value={upiMobile} onChangeText={v => setUpiMobile(v.replace(/\D/g, ''))} placeholder="10-digit" keyboardType="phone-pad" maxLength={10} /></View>
                     </View>
                   </View>
                 )}
@@ -337,9 +394,9 @@ function AddUserModal({ visible, onClose, sponsorId }) {
                 {tab === 'kyc' && userType === 'Distributor' && (
                   <View style={{ paddingTop: 4 }}>
                     <SectionHead iconName={Icons.kyc} label="KYC Details" />
-                    <Field label="Aadhaar Number" value={aadhaar} onChangeText={setAadhaar} placeholder="12-digit Aadhaar" keyboardType="numeric" hint="Optional" />
-                    <Field label="PAN Number"     value={pan}     onChangeText={setPan}     placeholder="ABCDE1234F" hint="Optional" />
-                    <Field label="GST Number"     value={gst}     onChangeText={setGst}     placeholder="09ABCDE1234F1Z5" hint="Optional" />
+                    <Field label="Aadhaar Number" value={aadhaar} onChangeText={v => setAadhaar(v.replace(/\D/g, ''))}     placeholder="12-digit Aadhaar" keyboardType="numeric" maxLength={12} hint="Optional" />
+                    <Field label="PAN Number"     value={pan}     onChangeText={v => setPan(v.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())} placeholder="ABCDE1234F"     maxLength={10} hint="Optional" />
+                    <Field label="GST Number"     value={gst}     onChangeText={v => setGst(v.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())} placeholder="09ABCDE1234F1Z5" maxLength={15} hint="Optional" />
                   </View>
                 )}
               </ScrollView>
@@ -363,7 +420,7 @@ function AddUserModal({ visible, onClose, sponsorId }) {
 
 const am = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet:        { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, paddingBottom: 36, maxHeight: '94%' },
+  sheet:        { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, paddingBottom: 24, maxHeight: '98%' },
   handle:       { width: 40, height: 4, backgroundColor: colors.outline, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   titleRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title:        { ...typography.headlineSmall, color: colors.onSurface },
