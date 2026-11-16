@@ -5,13 +5,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput, TouchableOpacity,
-  StatusBar, Alert, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, Image,
+  StatusBar, Alert, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, Image, Dimensions,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, PrimaryButton, Divider, PickerModal } from '../../components';
 import Icon, { Icons } from '../../components/Icon';
 import { getAllProducts } from '../../api/products';
+
+const { width: W } = Dimensions.get('window');
+const QR_SIZE = Math.min(W * 0.45, 180);
 import { getMySponsoredUsers } from '../../api/team';
 import { placeOrder } from '../../api/orders';
 import { getBanks, uploadImage } from '../../api/masters';
@@ -875,7 +878,7 @@ const s = StyleSheet.create({
   scroll:      { padding: spacing.lg },
   labelRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   sectionLabel:{ ...typography.titleSmall, color: colors.onSurface, fontWeight: '700' },
-  dateInput:   { borderWidth: 1.5, borderColor: colors.outline, borderRadius: radius.md, height: 48, paddingHorizontal: spacing.md, ...typography.bodyLarge, color: colors.onSurface, backgroundColor: colors.background, width: 160 },
+  dateInput:   { borderWidth: 1.5, borderColor: colors.outline, borderRadius: radius.md, height: 48, paddingHorizontal: spacing.md, ...typography.bodyLarge, color: colors.onSurface, backgroundColor: colors.background, flex: 1, maxWidth: 200 },
   dateHint:    { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 4 },
   toggleRow:   { flexDirection: 'row', gap: spacing.md },
   toggleBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 11, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.background },
@@ -956,16 +959,16 @@ const s = StyleSheet.create({
   qrZoomHint:     { fontSize: 10, color: colors.primary, textAlign: 'center', marginTop: 2 },
   qrExpandedBox:  { marginTop: 12, alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.outline },
   qrExpandedLabel:{ ...typography.labelMedium, color: colors.primary, fontWeight: '700', marginBottom: 8 },
-  qrExpandedImg:  { width: 180, height: 180, borderRadius: 12, borderWidth: 1, borderColor: colors.outline },
+  qrExpandedImg:  { width: QR_SIZE, height: QR_SIZE, borderRadius: 12, borderWidth: 1, borderColor: colors.outline },
 
   // Screenshot upload
-  ssUploadBox:  { borderWidth: 2, borderColor: colors.outline, borderStyle: 'dashed', borderRadius: 12, height: 110, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant },
+  ssUploadBox:  { borderWidth: 2, borderColor: colors.outline, borderStyle: 'dashed', borderRadius: 12, height: W * 0.28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant },
   ssPreview:    { width: '100%', height: '100%', borderRadius: 10 },
 
   // QR full modal
   qrOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
   qrModalBox:   { backgroundColor: colors.surface, borderRadius: 20, padding: 24, alignItems: 'center', width: '82%' },
-  qrFull:       { width: 220, height: 220, marginBottom: 12 },
+  qrFull:       { width: QR_SIZE * 1.2, height: QR_SIZE * 1.2, marginBottom: 12 },
   qrModalBank:  { ...typography.titleMedium, color: colors.onSurface, fontWeight: '700', marginBottom: 4 },
   qrModalUpi:   { ...typography.bodyMedium, color: colors.onSurfaceMuted, marginBottom: 16 },
   qrCloseBtn:   { borderWidth: 1.5, borderColor: colors.outline, borderRadius: 10, paddingHorizontal: 32, paddingVertical: 10 },

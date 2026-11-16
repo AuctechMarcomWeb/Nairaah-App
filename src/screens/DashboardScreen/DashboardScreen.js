@@ -310,7 +310,7 @@ const cf = StyleSheet.create({
   title:   { ...typography.titleMedium, color: colors.onSurface },
   row:     { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   dot:     { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  label:   { width: 120, ...typography.bodySmall, color: colors.onSurfaceMuted },
+  label:   { flex: 1.2, ...typography.bodySmall, color: colors.onSurfaceMuted },
   barBg:   { flex: 1, height: 8, backgroundColor: colors.outlineVariant, borderRadius: 4, marginHorizontal: 8, overflow: 'hidden' },
   barFill: { height: 8, borderRadius: 4 },
   pct:     { width: 60, ...typography.bodySmall, color: colors.onSurface, textAlign: 'right' },

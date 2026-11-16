@@ -1,10 +1,16 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Animated,
-  StatusBar, Image,
+  StatusBar, Image, Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { colors, typography } from '../../themes';
+
+const { width: W, height: H } = Dimensions.get('window');
+const LOGO_SIZE   = Math.min(W * 0.32, 140);   // 32% of screen, max 140
+const RING1_SIZE  = W * 0.80;                   // 80% of screen width
+const RING2_SIZE  = W * 0.50;
+const FOOTER_BOT  = H * 0.07;                   // 7% from bottom
 
 // ── Brand gradient (matches theme primary colors) ──────────
 const GRAD = ['#6B2A07', '#C0571C', '#EF8B61'];
@@ -38,8 +44,8 @@ export default function SplashScreen({ navigation }) {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Decorative rings */}
-      <View style={[s.ring, { width: 320, height: 320, opacity: 0.07 }]} />
-      <View style={[s.ring, { width: 200, height: 200, opacity: 0.10 }]} />
+      <View style={[s.ring, { width: RING1_SIZE, height: RING1_SIZE, borderRadius: RING1_SIZE/2, opacity: 0.07 }]} />
+      <View style={[s.ring, { width: RING2_SIZE, height: RING2_SIZE, borderRadius: RING2_SIZE/2, opacity: 0.10 }]} />
 
       {/* Logo box */}
       <Animated.View style={[s.logoWrap, { opacity: fade, transform: [{ scale }] }]}>
@@ -83,24 +89,24 @@ const s = StyleSheet.create({
   },
 
   // Logo
-  logoWrap: { alignItems: 'center', marginBottom: 28 },
+  logoWrap: { alignItems: 'center', marginBottom: H * 0.035 },
   logoCard: {
-    width: 140, height: 140,
-    borderRadius: 36,
+    width: LOGO_SIZE, height: LOGO_SIZE,
+    borderRadius: LOGO_SIZE * 0.26,
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
-    padding: 10,
+    padding: LOGO_SIZE * 0.07,
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.45, shadowRadius: 24,
     elevation: 18,
   },
-  logoImg: { width: 115, height: 115 },
+  logoImg: { width: LOGO_SIZE * 0.82, height: LOGO_SIZE * 0.82 },
 
   // Text
   textBox:  { alignItems: 'center' },
   appName:  {
-    fontSize: 36, fontWeight: '900',
+    fontSize: Math.min(W * 0.088, 36), fontWeight: '900',
     color: '#FFFFFF', letterSpacing: 3,
     marginBottom: 6,
   },
@@ -110,7 +116,7 @@ const s = StyleSheet.create({
   },
 
   // Footer
-  footer:  { position: 'absolute', bottom: 52, alignItems: 'center' },
+  footer:  { position: 'absolute', bottom: FOOTER_BOT, alignItems: 'center' },
   dotRow:  { flexDirection: 'row', gap: 6, marginBottom: 12 },
   dot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.3)' },
   dotActive: { backgroundColor: '#FFFFFF', width: 22, borderRadius: 4 },

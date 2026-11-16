@@ -252,14 +252,14 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   bgRing1: {
-    position: 'absolute', width: 220, height: 220, borderRadius: 110,
+    position: 'absolute', width: '55%', height: undefined, aspectRatio: 1, borderRadius: 999,
     borderWidth: 1.5, borderColor: 'rgba(192,87,28,0.20)',
-    top: -70, right: -60,
+    top: -40, right: -30,
   },
   bgRing2: {
-    position: 'absolute', width: 130, height: 130, borderRadius: 65,
+    position: 'absolute', width: '32%', height: undefined, aspectRatio: 1, borderRadius: 999,
     borderWidth: 1, borderColor: 'rgba(239,139,97,0.12)',
-    top: 30, left: -40,
+    top: 30, left: -20,
   },
 
   logoRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },

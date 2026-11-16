@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl, Image,
+  TouchableOpacity, StatusBar, Modal, ActivityIndicator, RefreshControl, Image, Dimensions,
 } from 'react-native';
 import { colors, spacing, radius, elevation, typography } from '../../themes';
 import { AppHeader, StatusChip, Divider, SearchBar } from '../../components';
 import { getAllProducts } from '../../api/products';
 
-const categories = ['All', 'Health', 'Beauty', 'Nutrition'];
+const { width: W } = Dimensions.get('window');
+const CARD_H      = Math.max(W * 0.22, 90);   // 22% of width, min 90
+const IMG_W       = CARD_H;                    // square image = card height
+const DETAIL_IMG_H = W * 0.40;                 // 40% of screen width
 
 function ProductCard({ item, onPress }) {
   const imageUrl = item.images?.[0] || null;
@@ -42,21 +45,21 @@ const pc = StyleSheet.create({
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     flexDirection: 'row', marginBottom: 10, overflow: 'hidden',
-    height: 100,
+    height: CARD_H,
     ...elevation.level1,
   },
   imageBox: {
-    width: 100,
+    width: IMG_W,
     backgroundColor: colors.surfaceVariant,
     position: 'relative',
   },
-  image: { width: 100, height: 100 },
+  image: { width: IMG_W, height: CARD_H },
   imagePlaceholder: {
-    width: 100, height: 100,
+    width: IMG_W, height: CARD_H,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.surfaceVariant,
   },
-  imageIcon: { fontSize: 32 },
+  imageIcon: { fontSize: Math.min(IMG_W * 0.32, 32) },
   outOverlay: {
     ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center',
@@ -142,11 +145,12 @@ const dm = StyleSheet.create({
   imageArea: {
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.surfaceVariant,
-    borderRadius: radius.lg, height: 160, marginBottom: 14, position: 'relative',
+    borderRadius: radius.lg, height: DETAIL_IMG_H,
+    marginBottom: 14, position: 'relative',
     overflow: 'hidden',
   },
   image: { width: '100%', height: '100%', borderRadius: radius.lg },
-  bigIcon: { fontSize: 52 },
+  bigIcon: { fontSize: Math.min(W * 0.13, 52) },
   category: { ...typography.labelMedium, color: colors.primaryLight, textTransform: 'uppercase', letterSpacing: 0.5 },
   name: { ...typography.headlineMedium, color: colors.onSurface, marginTop: 2 },
   desc: { ...typography.bodyMedium, color: colors.onSurfaceMuted, marginTop: 4, lineHeight: 20 },
@@ -293,6 +297,6 @@ const s = StyleSheet.create({
   catChipTextActive: { color: colors.white },
   scroll: {},
   empty: { alignItems: 'center', paddingVertical: 48 },
-  emptyIcon: { fontSize: 48, marginBottom: 10 },
+  emptyIcon: { fontSize: Math.min(W * 0.12, 48), marginBottom: 10 },
   emptyText: { ...typography.bodyMedium, color: colors.onSurfaceMuted },
 });

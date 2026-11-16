@@ -203,15 +203,15 @@ const s = StyleSheet.create({
   // Decorative background circles
   decCircle1: {
     position: 'absolute',
-    width: 180, height: 180, borderRadius: 90,
+    width: W * 0.45, height: W * 0.45, borderRadius: W * 0.225,
     backgroundColor: 'rgba(255,255,255,0.07)',
-    top: -60, right: -40,
+    top: -W * 0.12, right: -W * 0.10,
   },
   decCircle2: {
     position: 'absolute',
-    width: 120, height: 120, borderRadius: 60,
+    width: W * 0.30, height: W * 0.30, borderRadius: W * 0.15,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    top: 20, left: -30,
+    top: W * 0.05, left: -W * 0.08,
   },
 
   logoCircle: {
