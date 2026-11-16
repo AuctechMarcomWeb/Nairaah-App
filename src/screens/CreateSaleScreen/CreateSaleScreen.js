@@ -14,8 +14,8 @@ import Icon, { Icons } from '../../components/Icon';
 import { getAllProducts } from '../../api/products';
 import { getMySponsoredUsers } from '../../api/team';
 import { placeOrder } from '../../api/orders';
-
-const PAYMENT_METHODS = ['COD', 'Online', 'UPI', 'Wallet'];
+import { getBanks, uploadImage } from '../../api/masters';
+import { launchImageLibrary } from 'react-native-image-picker';
 const fmtMoney = (v) => `\u20B9${(Number(v) || 0).toLocaleString('en-IN')}`;
 
 function derivePaymentStatus(paid, total) {
@@ -181,12 +181,20 @@ export default function CreateSaleScreen({ navigation, route }) {
   );
   const [showProductPicker, setShowProductPicker] = useState(false);
 
-  const [paymentMethod, setPaymentMethod] = useState('COD');
+  const [paymentMethod, setPaymentMethod] = useState('Online');
   const [paidAmount,    setPaidAmount]    = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [notes,         setNotes]         = useState('');
   const [loading,       setLoading]       = useState(false);
   const [successModal,  setSuccessModal]  = useState({ open: false, order: null });
+
+  // Bank / QR / screenshot
+  const [bankList,      setBankList]      = useState([]);
+  const [banksLoading,  setBanksLoading]  = useState(false);
+  const [selectedBank,  setSelectedBank]  = useState(null);
+  const [qrModalOpen,   setQrModalOpen]   = useState(false);
+  const [ssUri,         setSsUri]         = useState('');
+  const [ssUploading,   setSsUploading]   = useState(false);
 
   useEffect(() => {
     getAllProducts().then(res => {
@@ -223,6 +231,14 @@ export default function CreateSaleScreen({ navigation, route }) {
     setSelectedBuyer(null); setExistingList([]);
     fetchBuyerList();
   }, [buyerType]);
+
+  // Banks load on mount — payment is always Online
+  useEffect(() => {
+    setBanksLoading(true);
+    getBanks().then(res => {
+      if (res.success) setBankList(res.data);
+    }).finally(() => setBanksLoading(false));
+  }, []);
 
   const handleSameAsAbove = (checked) => {
     setSameAsAbove(checked);
@@ -306,8 +322,9 @@ export default function CreateSaleScreen({ navigation, route }) {
       if (!newName.trim()) { Alert.alert('Required', 'Please enter buyer name.'); return; }
       if (!newPhone.trim() || newPhone.trim().length !== 10) { Alert.alert('Invalid', 'Please enter a valid 10-digit mobile number.'); return; }
     }
-    if ((paymentMethod === 'Online' || paymentMethod === 'UPI') && !transactionId.trim()) {
-      Alert.alert('Required', 'Please enter Transaction ID.'); return;
+    if (paymentMethod === 'Online') {
+      if (!transactionId.trim()) { Alert.alert('Required', 'Please enter Transaction ID.'); return; }
+      if (!ssUri) { Alert.alert('Required', 'Please upload payment screenshot.'); return; }
     }
     setLoading(true);
     try {
@@ -327,17 +344,20 @@ export default function CreateSaleScreen({ navigation, route }) {
         totalPrice: unitPrice(i.product) * i.qty,
       }));
 
-      const isOnline = paymentMethod === 'Online' || paymentMethod === 'UPI';
+      const isOnline = paymentMethod === 'Online';
       const payload = {
         ...(buyerId ? { buyer: buyerId } : { buyer: '' }),
         ...(buyerDetails ? { buyerDetails } : {}),
         buyerType, orderDate,
         items: itemsPayload, subtotal, discount: 0, totalAmount: total,
         paidAmount: paid, refundAmount: 0,
-        // Match Admin: Online always Paid; else derive from paid amount
         paymentStatus: isOnline ? 'Paid' : (paid >= total ? 'Paid' : paid > 0 ? 'Partial' : 'Pending'),
-        paymentMethod: (paymentMethod === 'UPI' || paymentMethod === 'Wallet') ? 'Online' : paymentMethod,
-        ...(transactionId.trim() ? { transactionId: transactionId.trim(), paymentId: transactionId.trim() } : {}),
+        paymentMethod: isOnline ? (selectedBank?.upi ? 'UPI' : 'Online') : paymentMethod,
+        ...(isOnline && transactionId.trim() ? {
+          transactionId: transactionId.trim(),
+          paymentId:     transactionId.trim(),
+          paymentss:     ssUri,
+        } : {}),
         notes: notes.trim() || '',
         shippingAddress: {
           name:    shipName.trim()    || (buyerMode === 'existing' ? selectedBuyer?.name    : newName)    || '',
@@ -369,7 +389,27 @@ export default function CreateSaleScreen({ navigation, route }) {
     setNewGender(''); setNewPincode(''); setNewCity(''); setNewState(''); setNewAddress('');
     setSameAsAbove(false); setShipName(''); setShipPhone(''); setShipPincode('');
     setShipCity(''); setShipState(''); setShipAddress('');
-    setCartItems([]); setPaymentMethod('COD'); setPaidAmount(''); setTransactionId(''); setNotes('');
+    setCartItems([]); setPaymentMethod('Online'); setPaidAmount(''); setTransactionId(''); setNotes('');
+    setSelectedBank(null); setSsUri(''); setBankList([]);
+  };
+
+  const handlePickScreenshot = () => {
+    launchImageLibrary(
+      { mediaType: 'photo', quality: 0.8 },
+      async (response) => {
+        if (response.didCancel || response.errorCode) return;
+        const asset = response.assets?.[0];
+        if (!asset) return;
+        setSsUploading(true);
+        const result = await uploadImage(asset.uri, asset.fileName || 'screenshot.jpg', asset.type || 'image/jpeg');
+        setSsUploading(false);
+        if (result.success) {
+          setSsUri(result.url);
+        } else {
+          Alert.alert('Upload Failed', result.message || 'Could not upload screenshot.');
+        }
+      }
+    );
   };
 
   const availableProducts = productList.filter(p => p.isActive !== false && p.isDelete !== true);
@@ -625,18 +665,87 @@ export default function CreateSaleScreen({ navigation, route }) {
 
           {/* ── 6. Payment ── */}
           <SectionCard iconName={Icons.payment} title="Payment">
-            <Text style={s.fieldLabel}>Payment Method</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                {PAYMENT_METHODS.map(m => (
-                  <TouchableOpacity key={m} style={[s.pmBtn, paymentMethod === m && s.pmBtnActive]} onPress={() => setPaymentMethod(m)}>
-                    <Text style={[s.pmTxt, paymentMethod === m && s.pmTxtActive]}>{m}</Text>
+
+            {/* Bank list */}
+            {banksLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={{ color: colors.onSurfaceMuted, marginTop: 6, fontSize: 13 }}>Loading banks…</Text>
+              </View>
+            ) : bankList.length === 0 ? (
+              <Text style={{ color: colors.onSurfaceMuted, fontSize: 13, marginBottom: 12 }}>No active banks found.</Text>
+            ) : (
+              <View style={{ gap: 10, marginBottom: 14 }}>
+                {bankList.map(bank => (
+                  <TouchableOpacity
+                    key={bank._id}
+                    style={[s.bankCard, selectedBank?._id === bank._id && s.bankCardActive]}
+                    onPress={() => setSelectedBank(bank)}
+                    activeOpacity={0.85}>
+
+                    {/* Bank info row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.bankName}>🏦  {bank.bankName}</Text>
+                        <Text style={s.bankMeta}>IFSC: <Text style={{ fontWeight: '700' }}>{bank.ifscCode}</Text></Text>
+                        <Text style={s.bankMeta}>A/c: <Text style={{ fontWeight: '700' }}>{bank.accountNumber}</Text></Text>
+                        {bank.upi ? <Text style={s.bankMeta}>UPI: <Text style={{ fontWeight: '700' }}>{bank.upi}</Text></Text> : null}
+                      </View>
+                      {bank.qr ? (
+                        <TouchableOpacity onPress={() => { setSelectedBank(bank); setQrModalOpen(true); }} activeOpacity={0.8}>
+                          <Image source={{ uri: bank.qr }} style={s.bankQrThumb} resizeMode="contain" />
+                          <Text style={s.qrZoomHint}>Tap to zoom</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    {/* QR expanded — show when this bank is selected */}
+                    {selectedBank?._id === bank._id && bank.qr ? (
+                      <View style={s.qrExpandedBox}>
+                        <Text style={s.qrExpandedLabel}>Scan to Pay</Text>
+                        <TouchableOpacity onPress={() => setQrModalOpen(true)} activeOpacity={0.85}>
+                          <Image source={{ uri: bank.qr }} style={s.qrExpandedImg} resizeMode="contain" />
+                          <Text style={s.qrZoomHint}>Tap to view full screen</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+
                   </TouchableOpacity>
                 ))}
               </View>
-            </ScrollView>
+            )}
 
-            <Text style={s.fieldLabel}>Paid Amount</Text>
+            {/* Transaction ID */}
+            <Field
+              label="Transaction ID *"
+              value={transactionId}
+              onChangeText={setTransactionId}
+              placeholder="e.g. TXN123456789"
+            />
+
+            {/* Screenshot upload */}
+            <Text style={[s.fieldLabel, { marginBottom: 8 }]}>Payment Screenshot <Text style={{ color: colors.error }}>*</Text></Text>
+            <TouchableOpacity style={s.ssUploadBox} onPress={handlePickScreenshot} disabled={ssUploading}>
+              {ssUploading ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : ssUri ? (
+                <Image source={{ uri: ssUri }} style={s.ssPreview} resizeMode="cover" />
+              ) : (
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 28, marginBottom: 4 }}>📷</Text>
+                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Tap to upload</Text>
+                  <Text style={{ color: colors.onSurfaceMuted, fontSize: 11 }}>Choose from gallery</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {ssUri ? (
+              <TouchableOpacity onPress={() => setSsUri('')} style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+                <Text style={{ color: colors.error, fontSize: 12 }}>✕ Remove screenshot</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Paid Amount */}
+            <Text style={[s.fieldLabel, { marginTop: 16 }]}>Paid Amount</Text>
             <TextInput
               style={s.amtInput} value={paidAmount}
               onChangeText={v => setPaidAmount(v.replace(/[^0-9]/g, ''))}
@@ -655,11 +764,23 @@ export default function CreateSaleScreen({ navigation, route }) {
               </View>
               {due > 0 && <Text style={s.dueLabel}>Due: {fmtMoney(due)}</Text>}
             </View>
-
-            {(paymentMethod === 'Online' || paymentMethod === 'UPI') && (
-              <Field label="Transaction ID *" value={transactionId} onChangeText={setTransactionId} placeholder="Enter transaction ID" />
-            )}
           </SectionCard>
+
+          {/* QR Zoom Modal */}
+          <Modal visible={qrModalOpen} transparent animationType="fade" onRequestClose={() => setQrModalOpen(false)}>
+            <TouchableOpacity style={s.qrOverlay} activeOpacity={1} onPress={() => setQrModalOpen(false)}>
+              <View style={s.qrModalBox}>
+                {selectedBank?.qr ? (
+                  <Image source={{ uri: selectedBank.qr }} style={s.qrFull} resizeMode="contain" />
+                ) : null}
+                <Text style={s.qrModalBank}>{selectedBank?.bankName}</Text>
+                {selectedBank?.upi ? <Text style={s.qrModalUpi}>UPI: {selectedBank.upi}</Text> : null}
+                <TouchableOpacity style={s.qrCloseBtn} onPress={() => setQrModalOpen(false)}>
+                  <Text style={s.qrCloseTxt}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {/* ── 7. Notes ── */}
           <SectionCard>
@@ -814,10 +935,6 @@ const s = StyleSheet.create({
   billLabel:   { ...typography.bodyMedium, color: colors.onSurfaceMuted },
   billVal:     { ...typography.bodyMedium, color: colors.onSurface },
   fieldLabel:  { ...typography.labelLarge, color: colors.onSurfaceVariant, marginBottom: 6 },
-  pmBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.outline, backgroundColor: colors.background },
-  pmBtnActive: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
-  pmTxt:       { ...typography.labelLarge, color: colors.onSurfaceMuted },
-  pmTxtActive: { color: colors.primary, fontWeight: '700' },
   amtInput:    { borderWidth: 1.5, borderColor: colors.outline, borderRadius: radius.md, height: 48, paddingHorizontal: spacing.md, ...typography.headlineSmall, color: colors.onSurface, backgroundColor: colors.background, marginBottom: spacing.sm },
   payStatusRow:{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
   payStatusLabel: { ...typography.bodyMedium, color: colors.onSurfaceMuted },
@@ -829,4 +946,28 @@ const s = StyleSheet.create({
   pickerProductImg: { width: 44, height: 44, borderRadius: 8, backgroundColor: colors.surfaceVariant },
   pickerName:  { ...typography.titleSmall, color: colors.onSurface },
   pickerSub:   { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 2 },
+
+  // Bank card
+  bankCard:       { flexDirection: 'row', alignItems: 'flex-start', borderWidth: 2, borderColor: colors.outline, borderRadius: 12, padding: 12, backgroundColor: colors.background, gap: 10 },
+  bankCardActive: { borderColor: colors.primary, backgroundColor: colors.primaryContainer },
+  bankName:       { ...typography.titleSmall, color: colors.primary, fontWeight: '700', marginBottom: 4 },
+  bankMeta:       { ...typography.bodySmall, color: colors.onSurfaceMuted, marginTop: 2 },
+  bankQrThumb:    { width: 64, height: 64, borderRadius: 8, borderWidth: 1, borderColor: colors.outline },
+  qrZoomHint:     { fontSize: 10, color: colors.primary, textAlign: 'center', marginTop: 2 },
+  qrExpandedBox:  { marginTop: 12, alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.outline },
+  qrExpandedLabel:{ ...typography.labelMedium, color: colors.primary, fontWeight: '700', marginBottom: 8 },
+  qrExpandedImg:  { width: 180, height: 180, borderRadius: 12, borderWidth: 1, borderColor: colors.outline },
+
+  // Screenshot upload
+  ssUploadBox:  { borderWidth: 2, borderColor: colors.outline, borderStyle: 'dashed', borderRadius: 12, height: 110, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant },
+  ssPreview:    { width: '100%', height: '100%', borderRadius: 10 },
+
+  // QR full modal
+  qrOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' },
+  qrModalBox:   { backgroundColor: colors.surface, borderRadius: 20, padding: 24, alignItems: 'center', width: '82%' },
+  qrFull:       { width: 220, height: 220, marginBottom: 12 },
+  qrModalBank:  { ...typography.titleMedium, color: colors.onSurface, fontWeight: '700', marginBottom: 4 },
+  qrModalUpi:   { ...typography.bodyMedium, color: colors.onSurfaceMuted, marginBottom: 16 },
+  qrCloseBtn:   { borderWidth: 1.5, borderColor: colors.outline, borderRadius: 10, paddingHorizontal: 32, paddingVertical: 10 },
+  qrCloseTxt:   { ...typography.titleSmall, color: colors.onSurfaceMuted },
 });

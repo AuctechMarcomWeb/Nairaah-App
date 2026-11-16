@@ -18,37 +18,40 @@ import AgreementScreen        from '../screens/AgreementScreen/AgreementScreen';
 import RefundPolicyScreen     from '../screens/RefundPolicyScreen/RefundPolicyScreen';
 
 import { DrawerOverlay } from './DrawerOverlay';
+import { DrawerProvider } from './DrawerContext';
 
 const Stack = createNativeStackNavigator();
 
 const AuthNavigation = () => {
   return (
-    <>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {/* Core */}
-        <Stack.Screen name="Dashboard"      component={DashboardScreen} />
-        <Stack.Screen name="SalesHistory"   component={SalesHistoryScreen} />
-        <Stack.Screen name="CreateSale"     component={CreateSaleScreen} />
-        <Stack.Screen name="Team"           component={TeamScreen} />
-        <Stack.Screen name="AddMember"      component={AddMemberScreen} />
-        <Stack.Screen name="Customers"      component={CustomersScreen} />
-        <Stack.Screen name="Products"       component={ProductsScreen} />
+    <DrawerProvider>
+      <>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {/* Core */}
+          <Stack.Screen name="Dashboard"      component={DashboardScreen} />
+          <Stack.Screen name="SalesHistory"   component={SalesHistoryScreen} />
+          <Stack.Screen name="CreateSale"     component={CreateSaleScreen} />
+          <Stack.Screen name="Team"           component={TeamScreen} />
+          <Stack.Screen name="AddMember"      component={AddMemberScreen} />
+          <Stack.Screen name="Customers"      component={CustomersScreen} />
+          <Stack.Screen name="Products"       component={ProductsScreen} />
 
-        {/* Commission & Earnings */}
-        <Stack.Screen name="Commission"     component={CommissionScreen} />
-        <Stack.Screen name="BusinessPayout" component={BusinessPayoutScreen} />
-        <Stack.Screen name="Payout"         component={PayoutScreen} />
+          {/* Commission & Earnings */}
+          <Stack.Screen name="Commission"     component={CommissionScreen} />
+          <Stack.Screen name="BusinessPayout" component={BusinessPayoutScreen} />
+          <Stack.Screen name="Payout"         component={PayoutScreen} />
 
-        {/* Profile */}
-        <Stack.Screen name="Profile"        component={ProfileScreen} />
-        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+          {/* Profile */}
+          <Stack.Screen name="Profile"        component={ProfileScreen} />
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
 
-        {/* Policies & Agreement */}
-        <Stack.Screen name="Agreement"      component={AgreementScreen} />
-        <Stack.Screen name="RefundPolicy"   component={RefundPolicyScreen} />
-      </Stack.Navigator>
-      <DrawerOverlay />
-    </>
+          {/* Policies & Agreement */}
+          <Stack.Screen name="Agreement"      component={AgreementScreen} />
+          <Stack.Screen name="RefundPolicy"   component={RefundPolicyScreen} />
+        </Stack.Navigator>
+        <DrawerOverlay />
+      </>
+    </DrawerProvider>
   );
 };
 
