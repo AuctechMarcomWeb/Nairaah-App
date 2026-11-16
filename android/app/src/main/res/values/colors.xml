@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- App launcher icon background — matches theme primary color #1A73E8 -->
-    <color name="ic_launcher_background">#1A73E8</color>
+    <!-- App launcher icon background — matches theme primary #C0571C -->
+    <color name="ic_launcher_background">#C0571C</color>
 </resources>

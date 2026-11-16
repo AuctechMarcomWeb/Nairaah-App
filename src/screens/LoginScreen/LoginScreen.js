@@ -17,89 +17,64 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { loginWithPassword } from '../../api/auth';
-import {
-  setLoading,
-  loginSuccess,
-  loginError,
-} from '../../redux/slice/userSlice';
+import { setLoading, loginSuccess, loginError } from '../../redux/slice/userSlice';
 import Icon from '../../components/Icon';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors, spacing, radius } from '../../themes';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { height: H } = Dimensions.get('window');
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen() {
   const dispatch = useDispatch();
   const { loading, error: reduxError } = useSelector(state => state.user);
 
-  const [userId, setUserId] = useState('');
-  const [password, setPassword] = useState('');
-  const [localError, setLocalError] = useState('');
+  const [userId,       setUserId]       = useState('');
+  const [password,     setPassword]     = useState('');
+  const [localError,   setLocalError]   = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [userFocused,  setUserFocused]  = useState(false);
+  const [passFocused,  setPassFocused]  = useState(false);
 
   const handleLogin = async () => {
     setLocalError('');
-
-    // Validation
-    if (!userId.trim()) {
-      setLocalError('Please enter User ID');
-      return;
-    }
-    if (!password.trim()) {
-      setLocalError('Please enter Password');
-      return;
-    }
+    if (!userId.trim())    { setLocalError('Please enter User ID');   return; }
+    if (!password.trim())  { setLocalError('Please enter Password');  return; }
 
     try {
-      // 1️⃣ Set loading
       dispatch(setLoading(true));
-      console.log('[LOGIN] Attempting login for userId:', userId);
-
-      // 2️⃣ Call API
       const result = await loginWithPassword(userId, password);
-      console.log('[LOGIN] API result:', JSON.stringify(result, null, 2));
 
-      // 3️⃣ Handle response
       if (result.success) {
-        console.log('[LOGIN] Success! Token:', result.token ? result.token.substring(0, 20) + '...' : 'NULL');
-        // Save to AsyncStorage
-        await AsyncStorage.setItem('authToken', result.token);
-        await AsyncStorage.setItem('userData', JSON.stringify(result.user));
-
-        // Update Redux
-        dispatch(
-          loginSuccess({
-            token: result.token,
-            user: result.user,
-          }),
-        );
-
-        // Navigation happens automatically in RootNavigation
+        await AsyncStorage.setItem('authToken',  result.token);
+        await AsyncStorage.setItem('userData',   JSON.stringify(result.user));
+        dispatch(loginSuccess({ token: result.token, user: result.user }));
       } else {
-        console.log('[LOGIN] Failed:', result.message);
-        // API error
         dispatch(loginError(result.message || 'Login failed'));
       }
     } catch (err) {
-      console.log('[LOGIN] Exception caught:', err.message, err);
       dispatch(loginError(err.message || 'Something went wrong'));
     }
   };
 
+  const displayError = localError || reduxError;
+
   return (
     <SafeAreaView style={s.root}>
-      <StatusBar backgroundColor="#1A237E" barStyle="light-content" />
+      <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        enabled={Platform.OS === 'ios'}
       >
-        {/* ── Top Brand Header ── */}
+        {/* ── Brand Header ── */}
         <View style={s.header}>
+          {/* Decorative circles */}
+          <View style={s.decCircle1} />
+          <View style={s.decCircle2} />
+
           <View style={s.logoCircle}>
             <Image
               source={require('../../assets/images/nairaah_logo.png')}
@@ -115,82 +90,66 @@ export default function LoginScreen({ navigation }) {
         <ScrollView
           contentContainerStyle={s.scroll}
           keyboardShouldPersistTaps="always"
-          keyboardDismissMode="none"
           showsVerticalScrollIndicator={false}
         >
           <View style={s.card}>
-            <Text style={s.title}>Sign In</Text>
-            <Text style={s.subtitle}>Enter your credentials to continue</Text>
 
-            {/* User ID Input */}
+            {/* Card top accent bar */}
+            <View style={s.accentBar} />
+
+            <Text style={s.title}>Welcome Back</Text>
+            <Text style={s.subtitle}>Sign in to your distributor account</Text>
+
+            {/* User ID */}
             <View style={s.inputGroup}>
               <Text style={s.inputLabel}>User ID</Text>
-              <View style={s.inputRow}>
-                <Icon
-                  name="account-circle-outline"
-                  size={20}
-                  color="#1A237E"
-                  style={{ marginRight: 10 }}
-                />
+              <View style={[s.inputRow, userFocused && s.inputRowFocused]}>
+                <Icon name="account-circle-outline" size={20} color={userFocused ? colors.primary : colors.onSurfaceMuted} style={{ marginRight: 10 }} />
                 <TextInput
                   style={s.input}
                   value={userId}
-                  onChangeText={text => {
-                    setUserId(text);
-                    setLocalError('');
-                  }}
-                  placeholder="Enter User ID"
-                  placeholderTextColor="#B0BEC5"
+                  onChangeText={t => { setUserId(t); setLocalError(''); }}
+                  placeholder="Enter your User ID"
+                  placeholderTextColor={colors.onSurfaceMuted}
                   editable={!loading}
                   returnKeyType="next"
+                  onFocus={() => setUserFocused(true)}
+                  onBlur={() => setUserFocused(false)}
                 />
               </View>
             </View>
 
-            {/* Password Input */}
+            {/* Password */}
             <View style={s.inputGroup}>
               <Text style={s.inputLabel}>Password</Text>
-              <View style={s.inputRow}>
-                <Icon
-                  name="lock-outline"
-                  size={20}
-                  color="#1A237E"
-                  style={{ marginRight: 10 }}
-                />
+              <View style={[s.inputRow, passFocused && s.inputRowFocused]}>
+                <Icon name="lock-outline" size={20} color={passFocused ? colors.primary : colors.onSurfaceMuted} style={{ marginRight: 10 }} />
                 <TextInput
                   style={s.input}
                   value={password}
-                  onChangeText={text => {
-                    setPassword(text);
-                    setLocalError('');
-                  }}
-                  placeholder="Enter Password"
-                  placeholderTextColor="#B0BEC5"
+                  onChangeText={t => { setPassword(t); setLocalError(''); }}
+                  placeholder="Enter your password"
+                  placeholderTextColor={colors.onSurfaceMuted}
                   secureTextEntry={!showPassword}
                   editable={!loading}
                   returnKeyType="done"
                   onSubmitEditing={handleLogin}
+                  onFocus={() => setPassFocused(true)}
+                  onBlur={() => setPassFocused(false)}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                >
-                  <Icon
-                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={20}
-                    color="#1A237E"
-                  />
+                <TouchableOpacity onPress={() => setShowPassword(p => !p)} disabled={loading}>
+                  <Icon name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.onSurfaceMuted} />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Error Message */}
-            {(localError || reduxError) && (
+            {/* Error */}
+            {displayError ? (
               <View style={s.errorRow}>
-                <Icon name="alert-circle-outline" size={16} color="#E53935" />
-                <Text style={s.errorText}>{localError || reduxError}</Text>
+                <Icon name="alert-circle-outline" size={15} color={colors.error} />
+                <Text style={s.errorText}>{displayError}</Text>
               </View>
-            )}
+            ) : null}
 
             {/* Login Button */}
             <TouchableOpacity
@@ -200,31 +159,26 @@ export default function LoginScreen({ navigation }) {
               activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="#FFF" size="small" />
               ) : (
                 <>
                   <Text style={s.btnText}>Login</Text>
-                  <Icon
-                    name="arrow-right"
-                    size={18}
-                    color="#FFF"
-                    style={{ marginLeft: 8 }}
-                  />
+                  <Icon name="arrow-right" size={18} color="#FFF" style={{ marginLeft: 8 }} />
                 </>
               )}
             </TouchableOpacity>
 
-       
-            {/* Terms */}
-            {/* <Text style={s.terms}>
-              By continuing, you agree to our{' '}
-              <Text style={s.termsLink}>Terms of Service</Text> and{' '}
-              <Text style={s.termsLink}>Privacy Policy</Text>
-            </Text> */}
+            {/* Support hint */}
+            <View style={s.supportRow}>
+              <Icon name="headset" size={14} color={colors.onSurfaceMuted} />
+              <Text style={s.supportText}>
+                Need help?{' '}
+                <Text style={s.supportLink}>Contact support</Text>
+              </Text>
+            </View>
           </View>
 
-          {/* Footer */}
-          <Text style={s.footer}>Secured by Nairaah • v1.0</Text>
+          <Text style={s.footer}>Secured by Nairaah  •  v1.0</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -234,164 +188,147 @@ export default function LoginScreen({ navigation }) {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#1A237E',
+    backgroundColor: colors.primary,   // #C0571C
   },
 
-  /* ── Header ── */
+  // ── Brand Header ──
   header: {
     alignItems: 'center',
-    paddingTop: Platform.OS === 'android' ? 36 : 20,
-    paddingBottom: 28,
+    paddingTop: Platform.OS === 'android' ? 32 : 20,
+    paddingBottom: 32,
+    overflow: 'hidden',
+    position: 'relative',
   },
+
+  // Decorative background circles
+  decCircle1: {
+    position: 'absolute',
+    width: 180, height: 180, borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    top: -60, right: -40,
+  },
+  decCircle2: {
+    position: 'absolute',
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    top: 20, left: -30,
+  },
+
   logoCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 80, height: 80, borderRadius: 40,
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  logoImg: { width: 52, height: 52 },
-  brandName: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  brandTagline: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.65)',
-    marginTop: 4,
-    letterSpacing: 0.4,
-  },
+  logoImg:     { width: 54, height: 54 },
+  brandName:   { fontSize: 28, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1.5 },
+  brandTagline:{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 4, letterSpacing: 0.4 },
 
-  /* ── Scroll ── */
-  scroll: {
-    flexGrow: 1,
-  },
+  // ── Scroll ──
+  scroll: { flexGrow: 1 },
 
-  /* ── Card ── */
+  // ── Card ──
   card: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 28,
-    paddingTop: 32,
+    paddingTop: 28,
     paddingBottom: 40,
-    minHeight: H * 0.62,
+    minHeight: H * 0.60,
   },
 
-  title: { fontSize: 24, fontWeight: '800', color: '#1A237E', marginBottom: 6 },
-  subtitle: {
-    fontSize: 14,
-    color: '#607D8B',
-    marginBottom: 32,
-    lineHeight: 22,
+  // Orange accent bar at top of card
+  accentBar: {
+    width: 48, height: 4,
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    alignSelf: 'center',
+    marginBottom: 24,
   },
 
-  /* ── Input ── */
-  inputGroup: { marginBottom: 20 },
+  title:    { fontSize: 24, fontWeight: '800', color: colors.primary, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: colors.onSurfaceMuted, marginBottom: 28, lineHeight: 22 },
+
+  // ── Input ──
+  inputGroup: { marginBottom: 18 },
   inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#455A64',
+    fontSize: 11, fontWeight: '700',
+    color: colors.onSurfaceVariant,
     marginBottom: 8,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA',
-    borderRadius: 12,
-    height: 56,
-    paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surfaceVariant,
+    borderRadius: radius.md,
+    height: 54,
+    paddingHorizontal: 14,
+    borderWidth: 1.5,
+    borderColor: colors.outline,
+  },
+  inputRowFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
   },
   input: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#1C2B4A',
+    fontSize: 15, fontWeight: '500',
+    color: colors.onSurface,
     height: '100%',
   },
 
-  /* ── Error ── */
+  // ── Error ──
   errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.errorContainer,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error,
   },
-  errorText: { fontSize: 13, color: '#E53935', flex: 1 },
+  errorText: { fontSize: 13, color: colors.error, flex: 1 },
 
-  /* ── Button ── */
+  // ── Button ──
   btn: {
-    backgroundColor: '#1A237E',
-    borderRadius: 14,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
     height: 54,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#1A237E',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 6,
     marginBottom: 20,
+    marginTop: 4,
   },
-  btnDisabled: { backgroundColor: '#90A4AE', shadowOpacity: 0, elevation: 0 },
-  btnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.4,
-  },
+  btnDisabled: { backgroundColor: colors.onSurfaceMuted, shadowOpacity: 0, elevation: 0 },
+  btnText:     { fontSize: 16, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 },
 
-  /* ── Info Box ── */
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#EEF0FB',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 20,
+  // ── Support ──
+  supportRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 6,
   },
-  infoTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1A237E',
-    marginBottom: 4,
-  },
-  infoText: { fontSize: 11, color: '#455A64', marginVertical: 2 },
+  supportText: { fontSize: 12, color: colors.onSurfaceMuted },
+  supportLink: { color: colors.primary, fontWeight: '700' },
 
-  /* ── Terms ── */
-  terms: {
-    textAlign: 'center',
-    fontSize: 11,
-    color: '#90A4AE',
-    marginTop: 20,
-    lineHeight: 18,
-  },
-  termsLink: { color: '#1A237E', fontWeight: '600' },
-
-  /* ── Footer ── */
+  // ── Footer ──
   footer: {
     textAlign: 'center',
     fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-    paddingVertical: 16,
-    backgroundColor: '#1A237E',
+    color: 'rgba(255,255,255,0.45)',
+    paddingVertical: 18,
+    backgroundColor: colors.primary,
   },
 });

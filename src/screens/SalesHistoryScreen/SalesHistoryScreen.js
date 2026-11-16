@@ -28,7 +28,7 @@ const ORDER_STATUS_COLOR = {
   Pending:      { bg: '#FEF0D4', text: '#E37400' },
   Approved:     { bg: '#E6F4EA', text: '#1E8E3E' },
   Processing:   { bg: '#FEF7E0', text: '#F9AB00' },
-  Shipped:      { bg: '#D3E3FD', text: '#1A73E8' },
+  Shipped:      { bg: '#FDDCCC', text: '#C0571C' },
   Delivered:    { bg: '#E6F4EA', text: '#1E8E3E' },
   Cancelled:    { bg: '#FCE8E6', text: '#D93025' },
   PartialCancel:{ bg: '#FFF3CD', text: '#856404' },
@@ -209,8 +209,8 @@ function OrderDetailModal({ visible, order, onClose, onCancel, onRefresh }) {
             <View style={{ width: 8 }} />
             <StatusPill status={o?.paymentStatus || 'Pending'} colorMap={PAY_STATUS_COLOR} />
             {o?.buyerType ? (
-              <View style={[dm.buyerTag, { backgroundColor: o.buyerType === 'Distributor' ? '#EDE9FE' : '#DBEAFE' }]}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: o.buyerType === 'Distributor' ? '#7C3AED' : '#1A73E8' }}>{o.buyerType}</Text>
+              <View style={[dm.buyerTag, { backgroundColor: o.buyerType === 'Distributor' ? '#EDE9FE' : '#FDDCCC' }]}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: o.buyerType === 'Distributor' ? '#7C3AED' : '#C0571C' }}>{o.buyerType}</Text>
               </View>
             ) : null}
           </View>
@@ -410,9 +410,9 @@ function OrderRow({ item, onPress }) {
   return (
     <TouchableOpacity style={row.wrap} onPress={onPress} activeOpacity={0.75}>
       <View style={row.left}>
-        <View style={[row.typeBadge, { backgroundColor: item.buyerType === 'Distributor' ? '#EDE9FE' : '#DBEAFE' }]}>
-        <Icon name={item.buyerType === 'Distributor' ? Icons.distributor : Icons.customer} size={12} color={item.buyerType === 'Distributor' ? '#7C3AED' : '#1A73E8'} />
-        <Text style={{ fontSize: 10, fontWeight: '700', color: item.buyerType === 'Distributor' ? '#7C3AED' : '#1A73E8', marginLeft: 3 }}>
+        <View style={[row.typeBadge, { backgroundColor: item.buyerType === 'Distributor' ? '#EDE9FE' : '#FDDCCC' }]}>
+        <Icon name={item.buyerType === 'Distributor' ? Icons.distributor : Icons.customer} size={12} color={item.buyerType === 'Distributor' ? '#7C3AED' : '#C0571C'} />
+        <Text style={{ fontSize: 10, fontWeight: '700', color: item.buyerType === 'Distributor' ? '#7C3AED' : '#C0571C', marginLeft: 3 }}>
           {item.buyerType === 'Distributor' ? 'Dist' : 'Cust'}
         </Text>
       </View>

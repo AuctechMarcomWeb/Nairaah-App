@@ -6,8 +6,8 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { colors, typography } from '../../themes';
 
-// ── Brand gradient (matches LoginScreen hero) ──────────────
-const GRAD = ['#0F0C29', '#302B63', '#24243E'];
+// ── Brand gradient (matches theme primary colors) ──────────
+const GRAD = ['#6B2A07', '#C0571C', '#EF8B61'];
 
 export default function SplashScreen({ navigation }) {
   const fade   = useRef(new Animated.Value(0)).current;
@@ -90,7 +90,7 @@ const s = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     padding: 10,
-    shadowColor: '#6C63FF',
+    shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.45, shadowRadius: 24,
     elevation: 18,

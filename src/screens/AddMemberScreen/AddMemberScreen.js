@@ -558,8 +558,8 @@ function UserRow({ item, onView }) {
         <Text style={ur.name} numberOfLines={1}>{item.name || '-'}</Text>
         <Text style={ur.sub}>{item.userId || '-'}  ·  {item.phone || '-'}</Text>
         <View style={{ flexDirection: 'row', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-          <View style={[ur.typeBadge, { backgroundColor: isDistributor ? '#EDE9FE' : '#DBEAFE' }]}>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: isDistributor ? '#7C3AED' : '#1A73E8' }}>
+          <View style={[ur.typeBadge, { backgroundColor: isDistributor ? '#EDE9FE' : '#FDDCCC' }]}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: isDistributor ? '#7C3AED' : '#C0571C' }}>
               {isDistributor ? 'Distributor' : 'Customer'}
             </Text>
           </View>
