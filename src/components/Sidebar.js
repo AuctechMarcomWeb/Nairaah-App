@@ -215,6 +215,12 @@ export default function Sidebar({ closeDrawer, navigation, activeRoute = 'Dashbo
         </View>
         <Text style={s.logoutText}>Logout</Text>
       </TouchableOpacity>
+
+      {/* ── Contact Info ── */}
+      <View style={s.contactBox}>
+        <Text style={s.contactItem}>📧  info@nairaah.in</Text>
+        <Text style={s.contactItem}>📞  7007416905</Text>
+      </View>
     </LinearGradient>
   );
 }
@@ -297,4 +303,11 @@ const s = StyleSheet.create({
     marginRight: 12,
   },
   logoutText: { fontSize: 14, fontWeight: '700', color: '#FF6B6B' },
+
+  contactBox: {
+    paddingHorizontal: 16, paddingBottom: 20, paddingTop: 8,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
+    gap: 4,
+  },
+  contactItem: { fontSize: 12, color: 'rgba(255,255,255,0.45)' },
 });
